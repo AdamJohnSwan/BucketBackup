@@ -1,25 +1,17 @@
-	<?xml version='1.0' standalone='yes'?>
-	<!DOCTYPE PLUGIN [
-	<!ENTITY name      "bucketbackup">
-	<!ENTITY author    "John Labod">
-	<!ENTITY version   "2020.01.19">
-	<!ENTITY plugdir   "/usr/local/emhttp/plugins/&name;">
-	<!ENTITY git    "JohnLabod/bucketbackup">
-	<!ENTITY pluginURL "https://gitlab.com/&git;/raw/master/plugins/&name;.plg">
-	]>
+<?xml version='1.0' standalone='yes'?>
+<!DOCTYPE PLUGIN [
+<!ENTITY name      "bucketbackup">
+<!ENTITY author    "John Labod">
+<!ENTITY version   "2020.01.19">
+<!ENTITY plugdir   "/usr/local/emhttp/plugins/&name;">
+<!ENTITY git    "JohnLabod/bucketbackup">
+<!ENTITY pluginURL "https://gitlab.com/&git;/raw/master/plugins/&name;.plg">
+]>
 
-<PLUGIN 
-	name="&name;"
-	author="&author;"
-	version="&version;"
-	launch="&launch;"
-	pluginURL="&pluginURL;"
-	min="6.4.0"
-	support=""
-	icon="users">
+<PLUGIN name="&name;" author="&author;" version="&version;" pluginURL="&pluginURL;" min="6.4.0" support="" icon="users">
 
 	<CHANGES>
-	</CHANGES
+	</CHANGES>
 
 	<!-- The 'pre-install' script. -->
 	<FILE Run="/usr/bin/php">
