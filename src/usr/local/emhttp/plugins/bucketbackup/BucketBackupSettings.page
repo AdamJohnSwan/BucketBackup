@@ -1,0 +1,13 @@
+Menu="OtherSettings"
+Icon="bucketbackup.png"
+Version="0.01"
+Author="John Labod"
+Title="Bucket Backup"
+
+---
+<?php
+
+
+	<p>Hello World</p>
+
+?>

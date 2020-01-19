@@ -1,0 +1,89 @@
+	<?xml version='1.0' standalone='yes'?>
+	<!DOCTYPE PLUGIN [
+	<!ENTITY name      "bucketbackup">
+	<!ENTITY author    "John Labod">
+	<!ENTITY version   "2020.01.19">
+	<!ENTITY plugdir   "/usr/local/emhttp/plugins/&name;">
+	<!ENTITY git    "JohnLabod/bucketbackup">
+	<!ENTITY pluginURL "https://gitlab.com/&git;/raw/master/plugins/&name;.plg">
+	]>
+
+<PLUGIN 
+	name="&name;"
+	author="&author;"
+	version="&version;"
+	launch="&launch;"
+	pluginURL="&pluginURL;"
+	min="6.4.0"
+	support=""
+	icon="users">
+
+	<CHANGES>
+	</CHANGES
+
+	<!-- The 'pre-install' script. -->
+	<FILE Run="/usr/bin/php">
+		<INLINE>
+			<![CDATA[
+			<?
+			  $version = parse_ini_file("/etc/unraid-version");
+			  
+			  if ( version_compare($version['version'],"6.4.0", "<") )
+			  {
+
+			  }
+			  echo "Cleaning Up Old Versions\n";
+			  if ( is_file("/usr/local/emhttp/plugins/bucketbackup/scripts/removal.php") ) {
+				exec("/usr/local/emhttp/plugins/bucketbackup/scripts/removal.php");
+			  }
+			  exec("rm -rf /usr/local/emhttp/plugins/bucketbackup");
+			?>
+			]]>
+		</INLINE>
+	</FILE>
+
+	<FILE Run="/bin/bash">
+	<INLINE>
+		# Remove old 'source' files
+		rm -f $(ls /boot/config/plugins/&name;/&name;*.txz 2>/dev/null &#124; grep -v '&version;')
+	</INLINE>
+	</FILE>
+
+	<!--
+	The 'source' file.
+	-->
+	<FILE Name="/boot/config/plugins/&name;/&name;-&version;-x86_64-1.txz" Run="upgradepkg --install-new">
+		<URL>https://gitlab.com/&git;/raw/master/archive/&name;-&version;-x86_64-1.txz</URL>
+	</FILE>
+
+	<!--
+	The icon
+	-->
+	<FILE Name="/usr/local/emhttp/plugins/&name;/bucketbackup.png">
+		<LOCAL>/boot/config/plugins/&name;/bucketbackup.png</LOCAL>
+	</FILE>
+
+	<!--
+	The 'post-install' script
+	-->
+	<FILE Run="/bin/bash">
+	<INLINE>
+		echo "Creating Directories"
+		rm -rf /tmp/bucketbackup/tempFiles
+		mkdir -p /tmp/bucketbackup/tempFiles
+		mkdir -p /boot/config/plugins/bucketbackup
+		echo ""
+	</INLINE>
+	</FILE>
+
+		<!--
+		The 'remove' script.
+		-->
+		<FILE Run="/bin/bash" Method="remove">
+		<INLINE>
+			removepkg &name;-&version;-x86_64-1
+			rm -rf &plugdir;
+			rm -rf /boot/config/plugins/&name;
+		</INLINE>
+	</FILE> 
+</PLUGIN>
