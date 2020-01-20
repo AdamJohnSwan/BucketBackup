@@ -1,4 +1,4 @@
-Menu="OtherSettings"
+Menu="Utilities"
 Icon="bucketbackup.png"
 Version="0.01"
 Author="John Labod"
@@ -6,7 +6,208 @@ Title="Bucket Backup"
 
 ---
 <?php
+
+if (count($_POST)) {
+	if ($_POST['#apply'] == "Apply") {
+		
+	} else if (($_POST['#command'] == "UUID") && (isset($_POST['change_uuid']))) {
+		
+		
+	}
+}
+
 ?>
 
-<p>Hello World</p>
+<div id="title" class="nocontrol">Common Settings</div>
+<form name="common_settings" action="/plugins/bucketbackup/include/api.php" method="POST">
 
+    <p></p>
+
+    <dl>
+        <dt style="cursor: help;">Bucket Type:</dt>
+        <dd>
+			<select name="bucket_type" size="1" id="bucket_type" onchange="check_settings_form()">
+				<option value="" disabled="true">Select...</option>
+				<option value="backblaze">Back Blaze</option>
+			</select>
+		</dd>
+    </dl>
+
+    <blockquote class="inline_help">
+        <p>Sets which service to store your backups with</p>
+    </blockquote>
+
+    <dl>
+		<dt style="cursor: help;">API Key:</dt>
+		<dd>
+			<input type="text" name="api_key" id="api_key" onblur="check_settings_form()">
+		</dd>
+	</dl>
+
+	<blockquote class="inline_help">
+        <p>This is your API key. You can get it from your backblaze account. If you don't know this then sign into your backblaze account and create an application key</p>
+    </blockquote>
+
+    <dl>
+		<dt style="cursor: help;">API Key ID:</dt>
+		<dd>
+			<input type="text" name="api_id" id="api_id" onblur="check_settings_form()">
+		</dd>
+	</dl>
+
+	<blockquote class="inline_help">
+        <p>This is your API Key ID. You can get it from your backblaze account. If you don't know this then sign into your backblaze account and create an application key</p>
+    </blockquote>
+	
+	<dl>
+		<dt style="cursor: help;">Encryption password:</dt>
+		<dd>
+			<input type="password" name="encryption_password" id="encryption_password" onblur="check_settings_form()">
+		</dd>
+	</dl>
+
+	<blockquote class="inline_help">
+        <p>Backups are encrypted before being stored. This password is used to decrypt your backup. Please do not forget it or you will not be able to decrypt your backups</p>
+    </blockquote>
+	
+	<dl>
+		<dt style="cursor: help;">Backup Location:</dt>
+		<dd id="backup_location_list" style="margin-left: 0;">
+			<input type="text" name="backup_location[]">
+			<button type="button" onclick="add_backup_location()">Add</button>
+		</dd>
+		
+	</dl>
+	<blockquote class="inline_help">
+        <p>These are the files and folders you want stored</p>
+    </blockquote>
+
+    <dl>
+        <dt style="cursor: help;">Backup Interval:</dt>
+        <dd>
+			<select name="backup_interval" size="1" id="backup_interval" onchange="check_settings_form()">
+				<option value="never">Never</option>
+				<option value="daily">Daily</option>
+				<option value="weekly">Weekly</option>
+				<option value="monthly">Monthly</option>
+			</select>
+		</dd>
+    </dl>
+    <blockquote class="inline_help">
+        <p>Specify how often you want your files backed up</p>
+    </blockquote>
+
+    <dl>
+        <dt>&nbsp;</dt>
+        <dd>
+			<input id="submit_settings" type="submit" name="#apply" value="Apply" disabled="true">
+			<input type="button" value="Done" onclick="done()">
+		</dd>
+    </dl>
+
+</form>
+
+<div id="title" class="nocontrol">Restore Backup</div>
+<form name="restore_backup" method="POST">
+	<p></p>
+
+    <dl>
+        <dt style="cursor: help;">Backup:</dt>
+        <dd>
+			<select name="bucket_to_restore" size="1">
+				<option value="" disabled="true">Select...</option>
+			</select>
+		</dd>
+    </dl>
+
+    <blockquote class="inline_help">
+        <p>A list of backups from the selected backup service.</p>
+    </blockquote>
+	
+	<dl>
+		<dt style="cursor: help;">Restore Location:</dt>
+		<dd>
+			<input type="text" name="restore_location">
+		</dd>
+	</dl>
+
+	<blockquote class="inline_help">
+        <p>This is the folder that you want to restore your backup files to.</p>
+    </blockquote>
+</form>
+
+<script type="text/javascript">
+	
+	// Make sure the help box popups are set to the right id so when a user clicks the (?) icon it opens the right help box
+	function setHelpBlocks() {
+		var helps = document.getElementsByTagName("blockquote");
+		for(var i = 0; i < helps.length; i++) {
+			helps[i].id = "helpinfo" + i;
+		}	
+	}
+	
+	// When the user clicks 'Add' on the backup location list this adds an input where they can add an extra folder to be backed up
+	function add_backup_location() {
+		var list = document.getElementById("backup_location_list");
+		
+		var container = document.createElement("div");
+		container.style = "margin-left:35%;";
+		
+		var inputField = document.createElement("input");
+		inputField.type = "text";
+		inputField.name = "backup_location[]";
+		
+		container.appendChild(inputField);
+		
+		var removeButton = document.createElement("button");
+		removeButton.type = "button";
+		removeButton.innerHTML = "Remove";
+		removeButton.onclick = function() {
+			var inputToRemove = this.parentNode;
+			inputToRemove.parentNode.removeChild(inputToRemove);
+		}
+		container.appendChild(removeButton);
+		
+		list.appendChild(container);
+	}
+	
+	function check_settings_form() {
+		var submitButton = document.getElementById("submit_settings");
+	
+		var formList = [];
+		formList.push(document.getElementById("bucket_type"));
+		formList.push(document.getElementById("api_key"));
+		formList.push(document.getElementById("api_id"));
+		formList.push(document.getElementById("encryption_password"));
+		formList.push(document.getElementById("backup_location_list"));
+		formList.push(document.getElementById("backup_interval"));
+		
+		var formComplete = true;
+		
+		for(var i = 0; i < formList.length; i++) {
+			if(formList[i].id === "backup_location_list") {
+				var isBackupLocation = false;
+				for(var x = 0; i < formList[i].getElementsByTagName("input"); x++) {
+					if(formList[i].getElementsByTagName("input")[x]) {
+						isBackupLocation = true;
+						break;
+					}
+				}
+				if(!isBackupLocation) {
+					formComplete = false;
+				}
+			} else {
+				if(!formList[i].value) {
+					formComplete = false;
+				}
+			}
+		}
+		
+		if(!formComplete) {
+			submitButton.disabled = true;
+		}
+	}
+	
+	setHelpBlocks()
+	
+</script>
