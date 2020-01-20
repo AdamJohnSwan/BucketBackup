@@ -1,1 +1,29 @@
-echo "test"
+#!/bin/bash
+
+cd /usr/local/emhttp/plugins/bucketbackup/
+
+app_id=$(cat settings.config | jq -r '.app_id')
+app_key=$(cat settings.config | jq -r '.app_key')
+backup_locations=$(cat settings.config | jq '.backup_location')
+bucket_type=$(cat settings.config | jq '.bucket_type')
+encryption_password=$(cat settings.config | jq '.encryption_password')
+
+authurl=$(printf "https://api.backblazeb2.com/b2api/v2/")
+
+#response=$(curl -s  "${authurl}b2_authorize_account" -u "${app_id}:${app_key}")
+
+#if [ $(echo $response | jq -r '.status') != null ];
+#then
+#       echo "Backblaze returned unauthorized"
+#       echo $response | jq '.'
+#       exit 1
+#fi
+
+# Estimate how big the backup will be
+total_data=0
+for row in $(echo ${backup_locations} | jq -r .[]);
+do
+        data=$(du -s ${row} | awk '{print $1}')
+        total_data=$(($total_data + $data))
+done
+echo $total_data
