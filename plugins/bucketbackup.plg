@@ -28,6 +28,10 @@
 			  if ( is_file("/usr/local/emhttp/plugins/bucketbackup/scripts/removal.php") ) {
 				exec("/usr/local/emhttp/plugins/bucketbackup/scripts/removal.php");
 			  }
+			  if ( is_file("/boot/config/plugins/dynamix/bucketbackup.cron") ) {
+				exec("rm /boot/config/plugins/dynamix/bucketbackup.cron");
+				exec("update_cron");
+			  }
 			  exec("rm -rf /usr/local/emhttp/plugins/bucketbackup");
 			?>
 			]]>
@@ -76,6 +80,8 @@
 			removepkg &name;-&version;-x86_64-1
 			rm -rf &plugdir;
 			rm -rf /boot/config/plugins/&name;
+			rm /boot/config/plugins/dynamix/bucketbackup.cron;
+			update_cron;
 		</INLINE>
 	</FILE> 
 </PLUGIN>

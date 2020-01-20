@@ -7,19 +7,33 @@ Title="Bucket Backup"
 ---
 <?php
 
+$plugin = "bucketbackup";
+
+require_once("/usr/local/emhttp/plugins/{$plugin}/include/api.php");
+
 if (count($_POST)) {
-	if ($_POST['#apply'] == "Apply") {
-		
-	} else if (($_POST['#command'] == "UUID") && (isset($_POST['change_uuid']))) {
-		
-		
-	}
+        if ($_POST['#apply'] == "Apply") {
+                $settingsObj = new \stdClass();
+                $settingsObj->app_id = $_POST["api_id"];
+                $settingsObj->app_key = $_POST["api_key"];
+                $settingsObj->backup_interval = $_POST["backup_interval"];
+                $settingsObj->backup_location = $_POST["backup_location"];
+                $settingsObj->bucket_type = $_POST["bucket_type"];
+                $settingsObj->encryption_password = $_POST["encryption_password"];
+
+                $settingsJson = json_encode($settingsObj);
+
+				//Update the settings config file
+				update_settings($settingsJson);
+                //Update the cron with the backup schedule
+                update_cron($_POST["backup_interval"]);
+        }
 }
 
 ?>
 
 <div id="title" class="nocontrol">Common Settings</div>
-<form name="common_settings" action="/plugins/bucketbackup/include/api.php" method="POST">
+<form name="common_settings" method="POST">
 
     <p></p>
 
