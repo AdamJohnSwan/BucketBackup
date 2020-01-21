@@ -8,16 +8,18 @@ backup_locations=$(cat settings.config | jq '.backup_location')
 bucket_type=$(cat settings.config | jq '.bucket_type')
 encryption_password=$(cat settings.config | jq '.encryption_password')
 
+echo $backup_locations
+
 authurl=$(printf "https://api.backblazeb2.com/b2api/v2/")
 
-#response=$(curl -s  "${authurl}b2_authorize_account" -u "${app_id}:${app_key}")
+response=$(curl -s  "${authurl}b2_authorize_account" -u "${app_id}:${app_key}")
 
-#if [ $(echo $response | jq -r '.status') != null ];
-#then
-#       echo "Backblaze returned unauthorized"
-#       echo $response | jq '.'
-#       exit 1
-#fi
+if [ $(echo $response | jq -r '.status') != null ];
+then
+       echo "Backblaze returned unauthorized"
+       echo $response | jq '.'
+       exit 1
+fi
 
 # Estimate how big the backup will be
 total_data=0
@@ -26,4 +28,28 @@ do
         data=$(du -s ${row} | awk '{print $1}')
         total_data=$(($total_data + $data))
 done
-echo $total_data
+
+declare -i filecount=0
+backup="backup${filecount}.tar"
+
+for row in $(echo ${backup_locations} | jq -r .[]);
+do
+	find ${row} -type f -follow -print0 | while IFS= read -d '' -r file; do
+		# remove first slash of file if it has one. This is so tar doesn't throw a bunch of warnings about the first slash
+		target=$(echo "${file}" | sed '/^\// s/.//')
+			if test -f $backup;
+			then
+				# use tar from the root directory since we removed the first slash
+				tar rf $backup -C / "$target"
+			else
+				# create a new tar file
+				tar cf $backup -C / "$target"
+			fi
+
+			if [ $(du -s $backup | awk '{ print $1 }') -gt 117558 ];
+			then
+				filecount+=1
+				backup="backup${filecount}.tar"
+			fi
+	done
+done

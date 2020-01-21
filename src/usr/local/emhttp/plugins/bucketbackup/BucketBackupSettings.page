@@ -8,8 +8,17 @@ Title="Bucket Backup"
 <?php
 
 $plugin = "bucketbackup";
-
 require_once("/usr/local/emhttp/plugins/{$plugin}/include/api.php");
+
+$settings = file_get_contents("/usr/local/emhttp/plugins/{$plugin}/settings.config");
+$json = json_decode($settings,true);
+$app_id = $json["app_id"];
+$api_key = $json["api_key"];
+$backup_interval = $json["backup_interval"];
+$bucket_type = $json["bucket_type"];
+$encryption_password = $json["encryption_password"];
+
+
 
 if (count($_POST)) {
         if ($_POST['#apply'] == "Apply") {
@@ -42,7 +51,7 @@ if (count($_POST)) {
         <dd>
 			<select name="bucket_type" size="1" id="bucket_type" onchange="check_settings_form()">
 				<option value="" disabled="true">Select...</option>
-				<option value="backblaze">Back Blaze</option>
+				<option <?php if ($bucket_type == 'backblaze' ) echo 'selected' ; ?> value="backblaze">Back Blaze</option>
 			</select>
 		</dd>
     </dl>
@@ -54,7 +63,7 @@ if (count($_POST)) {
     <dl>
 		<dt style="cursor: help;">API Key:</dt>
 		<dd>
-			<input type="text" name="api_key" id="api_key" onblur="check_settings_form()">
+			<input type="text" name="api_key" id="api_key" value="<?php $api_key; ?>" onblur="check_settings_form()">
 		</dd>
 	</dl>
 
@@ -65,7 +74,7 @@ if (count($_POST)) {
     <dl>
 		<dt style="cursor: help;">API Key ID:</dt>
 		<dd>
-			<input type="text" name="api_id" id="api_id" onblur="check_settings_form()">
+			<input type="text" name="api_id" id="api_id" value="<?php $api_id; ?>" onblur="check_settings_form()">
 		</dd>
 	</dl>
 
@@ -76,7 +85,7 @@ if (count($_POST)) {
 	<dl>
 		<dt style="cursor: help;">Encryption password:</dt>
 		<dd>
-			<input type="password" name="encryption_password" id="encryption_password" onblur="check_settings_form()">
+			<input type="password" name="encryption_password" id="encryption_password" value="<?php $encryption_password; ?>" onblur="check_settings_form()">
 		</dd>
 	</dl>
 
@@ -100,10 +109,10 @@ if (count($_POST)) {
         <dt style="cursor: help;">Backup Interval:</dt>
         <dd>
 			<select name="backup_interval" size="1" id="backup_interval" onchange="check_settings_form()">
-				<option value="never">Never</option>
-				<option value="daily">Daily</option>
-				<option value="weekly">Weekly</option>
-				<option value="monthly">Monthly</option>
+				<option <?php if ($backup_interval == 'never' ) echo 'selected' ; ?> value="never">Never</option>
+				<option <?php if ($backup_interval == 'daily' ) echo 'selected' ; ?> value="daily">Daily</option>
+				<option <?php if ($backup_interval == 'weekly' ) echo 'selected' ; ?> value="weekly">Weekly</option>
+				<option <?php if ($backup_interval == 'monthly' ) echo 'selected' ; ?> value="monthly">Monthly</option>
 			</select>
 		</dd>
     </dl>
@@ -121,7 +130,7 @@ if (count($_POST)) {
 
 </form>
 
-<div id="title" class="nocontrol">Restore Backup</div>
+<div id="title2" class="nocontrol">Restore Backup</div>
 <form name="restore_backup" method="POST">
 	<p></p>
 
