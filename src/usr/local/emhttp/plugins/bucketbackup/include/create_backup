@@ -10,14 +10,79 @@ create_encrypted () {
 	> $enc_backup
 	#delete the tar.gz file
 	rm "${backup}.gz"
-	#upload it to back blaze
-	small_file
+	echo "Sending backup $filecount to backblaze"
+	#check if file is great than 5G
+	if [ $(du -s -B1 $enc_backup | awk '{ print $1 }') -gt 5000000000 ];
+	then
+		large file
+	else
+		small_file
+	fi
 	#delete the dat file
 	rm $enc_backup 
 }
 
 large_file () {
-:
+	echo "File is greater than 5G. Sending with backblaze large file api"
+	# initiate the large upload
+	start_large_upload_response=$(curl -s -H "Authorization: $token" \
+	--data "{\"bucketId\": \"${bucketid}\",\"fileName\": \"${enc_backup}\",\"contentType\": \"application/octet-stream\"}" \
+	"${apiurl}b2_start_large_file")
+	check_for_bad_request "$start_large_upload_response"
+	large_upload_file_id=$(echo $start_large_upload_response | jq -r '.fileId')
+	
+	# get the large upload url
+	large_upload_url_response=$(curl -s \
+    -H "Authorization: $token" \
+    --data "{\"fileId\": \"${large_upload_file_id}\"}" \
+    "${apiurl}b2_get_upload_part_url")
+	check_for_bad_request "$large_upload_url_response"
+	large_upload_token=$(echo $large_upload_url_response | jq -r '.authorizationToken')
+	large_upload_url=$(echo $large_upload_url_response | jq -r '.uploadUrl')
+
+	# Prepare the large file be spliting it into chunks
+	echo "splitting large file into parts"
+	split -b $size_of_part $enc_backup bz_chunk_
+	chunk_names=$(ls -1 bz_chunk_*)
+
+	# Upload file
+	part_no=1;
+	part_sha1_array=();
+	for chunk in $chunk_names;
+	do
+		echo "uploading part ${part_no}"
+		chunk_sha1=$(openssl dgst -sha1 $chunk | awk '{print $2;}')
+		part_sha1_array+=($chunk_sha1);
+		size_of_chunk=$(ls -l $chunk | awk '{ print $5 }')
+		
+		large_upload_response=$(curl -s \
+			-H "Authorization: $large_upload_token" \
+			-H "X-Bz-Part-Number: $part_no" \
+			-H "X-Bz-Content-Sha1: $chunk_sha1" \
+			-H "Content-Length: $size_of_chunk" \
+			--data-binary "@$chunk" \
+			$large_upload_url)
+		check_for_bad_request "$large_upload_response"
+		let part_no+=1;
+	done
+	
+	#Tell backblaze that the file has finished uploading
+	# Create JSON
+	JSON='{ "partSha1Array":[';
+	for sha1 in "${part_sha1_array[@]}"; do
+		JSON+="\"$sha1\",";
+	done
+	JSON="${JSON%?}";
+	JSON+="], \"fileId\":\"$large_upload_file_id\"}";
+
+	finish_large_upload_response=$(curl \
+		-H "Authorization: $token" \
+		-d "$JSON" \
+		"${apiurl}b2_finish_large_file")
+	check_for_bad_request "$finish_large_upload_response"
+	# delete all the chunks
+	rm bz_chunk_*
+	echo $finish_large_upload_response | jq .
 }
 
 small_file () {
@@ -31,7 +96,7 @@ small_file () {
 	sha1_of_file=$(openssl dgst -sha1 $enc_backup | awk '{print $2;}')
 	
 	# upload the file
-	upload_response=$(curl \
+	upload_response=$(curl -s -T "$enc_backup" -X POST\
 	-H "Authorization: $uploadtoken" \
 	-H "X-Bz-File-Name: $enc_backup" \
 	-H "Content-Type: application/octet-stream" \
@@ -54,6 +119,14 @@ check_for_bad_request () {
 
 cd /usr/local/emhttp/plugins/bucketbackup/
 
+#check if jq is installed
+if ! [ -x "$(command -v jq)" ]; 
+then
+	echo 'Error: jq is not installed.'
+	exit 1
+fi
+
+echo "Getting authentication token"
 app_id=$(cat settings.config | jq -r '.app_id')
 app_key=$(cat settings.config | jq -r '.app_key')
 backup_locations=$(cat settings.config | jq '.backup_location')
@@ -72,9 +145,10 @@ accountid=$(echo $authresponse | jq -r '.accountId')
 size_of_part=$( echo $authresponse | jq -r '.recommendedPartSize')
 minimum_part_size=$( echo $authresponse | jq -r '.absoluteMinimumPartSize')
 
+echo "Creating a bucket to hold the backup"
 #create a new bucket to hold the backup
-# the name is the current date and time
-bucketname=$(date +"%m-%d-%Y-%H-%M-%S")
+# the name contains the current date and time
+bucketname="bucketbackup$(date +"%m-%d-%Y-%H-%M-%S")"
 buckettype="allPrivate"
 bucketcreate_response=$(curl -s -H  "Authorization: $token" \
 	--data "{\"accountId\":\"${accountid}\",\"bucketName\":\"${bucketname}\",\"bucketType\":\"${buckettype}\"}" \
@@ -84,12 +158,19 @@ bucketid=$(echo $bucketcreate_response | jq -r '.bucketId')
 
 #change directory to the array so the storage space on the flash drive isn't completely taken up
 cd /mnt/user/
+backup_dir=bucketbackup_archive_dir
+if test -d "$backup_dir"; then
+    rm -r "$backup_dir"
+fi
+mkdir "$backup_dir"
+cd "$backup_dir"
 
 declare -i filecount=0
 backup="backup${filecount}.tar"
 
 for row in $(echo ${backup_locations} | jq -r .[]);
 do
+	echo "Backing up $row"
 	target=$(echo ${row} | sed '/^\// s/.//')
 	while IFS= read -d '' -r file; do
 		target=$(echo "${file}" | sed '/^\// s/.//')
@@ -101,9 +182,11 @@ do
 			# create a new tar file
 			tar cf $backup -C / "$target"
 		fi
-
-		if [ $(du -s $backup | awk '{ print $1 }') -gt 117558 ];
+		
+		# try to split the backup into 2GB parts
+		if [ $(du -s -B1 $backup | awk '{ print $1 }') -gt 2000000000 ];
 		then
+			echo "creating archive of backup $filecount"
 			# archive size has been reached. gzip it, encrypt it and send it by either backblazes regular or large file upload routine
 			create_encrypted
 			#since the previous batch of files have been uploaded, move on to the next
@@ -116,10 +199,9 @@ done
 # check to see if backup file still exists. If it does then there are still some more files that need to be uploaded
 if test -f $backup;
 then
-	if [ $(du -s $backup | awk '{ print $1 }') -gt 5000000000 ];
-	then
-		: #create large file
-	else
-		create_encrypted
-	fi
+	create_encrypted
 fi
+
+#remove temporary backup dir
+cd ../
+rm -r "$backup_dir"
