@@ -10,36 +10,119 @@ Title="Bucket Backup"
 $plugin = "bucketbackup";
 require_once("/usr/local/emhttp/plugins/{$plugin}/include/api.php");
 
-$settings = file_get_contents("/usr/local/emhttp/plugins/{$plugin}/settings.config");
-$json = json_decode($settings,true);
-$app_id = $json["app_id"];
-$api_key = $json["api_key"];
-$backup_interval = $json["backup_interval"];
-$bucket_type = $json["bucket_type"];
-$encryption_password = $json["encryption_password"];
+function showSettings($settings) {
+	global $api_id;
+	global $api_key;
+	global $backup_locations;
+	global $backup_interval;
+	global $time;
+	global $day_of_week;
+	global $day_of_month;
+	global $bucket_type;
+	global $encryption_password;
+	
+	$json = json_decode($settings,true);
+	$api_id = $json["api_id"];
+	$api_key = $json["api_key"];
+	$backup_locations = $json["backup_location"];
+	$backup_interval = $json["backup_interval"];
+	$time = $json["time"];
+	$day_of_week = $json["day_of_week"];
+	$day_of_month = $json["day_of_month"];
+	$bucket_type = $json["bucket_type"];
+	$encryption_password = $json["encryption_password"];
+}
 
+$api_id = "";
+$api_key = "";
+$backup_locations = "";
+$backup_interval = "";
+$time = "";
+$day_of_week = "";
+$day_of_month = "";
+$bucket_type = "";
+$encryption_password = "";
 
+if (file_exists("/usr/local/emhttp/plugins/{$plugin}/settings.config")) {
+	showSettings(file_get_contents("/usr/local/emhttp/plugins/{$plugin}/settings.config"));
+}
 
 if (count($_POST)) {
         if ($_POST['#apply'] == "Apply") {
                 $settingsObj = new \stdClass();
-                $settingsObj->app_id = $_POST["api_id"];
-                $settingsObj->app_key = $_POST["api_key"];
+                $settingsObj->api_id = $_POST["api_id"];
+                $settingsObj->api_key = $_POST["api_key"];
                 $settingsObj->backup_interval = $_POST["backup_interval"];
+				$settingsObj->time = $_POST["time"];
+				$settingsObj->day_of_week = $_POST["day_of_week"];
+				$settingsObj->day_of_month = $_POST["day_of_month"];
                 $settingsObj->backup_location = $_POST["backup_location"];
                 $settingsObj->bucket_type = $_POST["bucket_type"];
                 $settingsObj->encryption_password = $_POST["encryption_password"];
 
                 $settingsJson = json_encode($settingsObj);
-
+				
 				//Update the settings config file
 				update_settings($settingsJson);
                 //Update the cron with the backup schedule
                 update_cron($_POST["backup_interval"]);
+				
+				showSettings($settingsJson);
         }
 }
 
 ?>
+
+<script type="text/javascript" src="<?autov('/webGui/javascript/jquery.filetree.js')?>"></script>
+<link type="text/css" rel="stylesheet" href="<?autov('/webGui/styles/jquery.filetree.css')?>" >
+<script type="text/javascript">
+
+	function openFileBrowser(el) {
+		var p = $(el);
+		// Skip is fileTree is already open
+		if ( p.next().hasClass('fileTree') ){return null;}
+		// create a random id
+		var r = Math.floor((Math.random()*1000)+1);
+		// Add a new span and load fileTree
+		p.after("<div id='fileTree"+r+"' class='textarea fileTree'></div>");
+		var ft = $('#fileTree'+r);
+		ft.fileTree({
+			root: '/mnt/user/',
+			filter: 'HIDE_FILES_FILTER',
+			allowBrowsing : true
+		}, function(file) {
+		}, function(folder){
+			p.val(folder);
+			p.trigger('change');
+		});
+		// Format fileTree according to parent position, height and width
+		ft.css({
+			'left':p.position().left,
+			'top':( p.position().top + p.clientHeight ),
+			'width':(p.width()),
+			'position': 'absolute',
+			'background-color': 'white',
+			'z-index': 1000
+		});
+		// close if click elsewhere
+		$(document).mouseup(function(e) {
+			if(!ft.is(e.target) && ft.has(e.target).length === 0) {
+				ft.slideUp('fast',function (){ 
+					$(ft).remove();
+				});
+			}
+		});
+		// close if parent changed
+		p.bind('keydown',function() {
+			ft.slideUp('fast',function (){
+				$(ft).remove();
+			});
+		});
+		// Open fileTree
+		ft.slideDown('fast');
+	} 
+</script>
+
 
 <div id="title" class="nocontrol">Common Settings</div>
 <form name="common_settings" method="POST">
@@ -49,7 +132,7 @@ if (count($_POST)) {
     <dl>
         <dt style="cursor: help;">Bucket Type:</dt>
         <dd>
-			<select name="bucket_type" size="1" id="bucket_type" onchange="check_settings_form()">
+			<select name="bucket_type" size="1" id="bucket_type" >
 				<option value="" disabled="true">Select...</option>
 				<option <?php if ($bucket_type == 'backblaze' ) echo 'selected' ; ?> value="backblaze">Back Blaze</option>
 			</select>
@@ -63,7 +146,7 @@ if (count($_POST)) {
     <dl>
 		<dt style="cursor: help;">API Key:</dt>
 		<dd>
-			<input type="text" name="api_key" id="api_key" value="<?php $api_key; ?>" onblur="check_settings_form()">
+			<input type="text" name="api_key" id="api_key" value="<?php echo $api_key; ?>" >
 		</dd>
 	</dl>
 
@@ -74,7 +157,7 @@ if (count($_POST)) {
     <dl>
 		<dt style="cursor: help;">API Key ID:</dt>
 		<dd>
-			<input type="text" name="api_id" id="api_id" value="<?php $api_id; ?>" onblur="check_settings_form()">
+			<input type="text" name="api_id" id="api_id" value="<?php echo $api_id; ?>" >
 		</dd>
 	</dl>
 
@@ -85,7 +168,7 @@ if (count($_POST)) {
 	<dl>
 		<dt style="cursor: help;">Encryption password:</dt>
 		<dd>
-			<input type="password" name="encryption_password" id="encryption_password" value="<?php $encryption_password; ?>" onblur="check_settings_form()">
+			<input type="password" name="encryption_password" id="encryption_password" value="<?php echo $encryption_password; ?>" >
 		</dd>
 	</dl>
 
@@ -96,8 +179,20 @@ if (count($_POST)) {
 	<dl>
 		<dt style="cursor: help;">Backup Location:</dt>
 		<dd id="backup_location_list" style="margin-left: 0;">
-			<input type="text" name="backup_location[]">
+			<input type="text" name="backup_location[]"
+				onclick="openFileBrowser(this);"
+				value="<?php  echo $backup_locations[0] ?>" >
 			<button type="button" onclick="add_backup_location()">Add</button>
+			<? if ($backup_locations != ""): ?>
+				<?php for($i = 1; $i < sizeof($backup_locations); $i++): ?>
+					<div style="margin-left: 35%;">
+						<input type="text" name="backup_location[]" 
+							onclick="openFileBrowser(this);"
+							value="<?php echo $backup_locations[$i]; ?>" >
+						<button type="button" onclick="removeLocation(this)">Remove</button>
+					</div>
+				<?php endfor; ?>
+			<? endif; ?>
 		</dd>
 		
 	</dl>
@@ -108,12 +203,13 @@ if (count($_POST)) {
     <dl>
         <dt style="cursor: help;">Backup Interval:</dt>
         <dd>
-			<select name="backup_interval" size="1" id="backup_interval" onchange="check_settings_form()">
+			<select name="backup_interval" size="1" id="backup_interval" onchange="changeBackupInterval()">
 				<option <?php if ($backup_interval == 'never' ) echo 'selected' ; ?> value="never">Never</option>
 				<option <?php if ($backup_interval == 'daily' ) echo 'selected' ; ?> value="daily">Daily</option>
 				<option <?php if ($backup_interval == 'weekly' ) echo 'selected' ; ?> value="weekly">Weekly</option>
 				<option <?php if ($backup_interval == 'monthly' ) echo 'selected' ; ?> value="monthly">Monthly</option>
 			</select>
+			<?php readfile("/usr/local/emhttp/plugins/{$plugin}/timeselect.php") ?>
 		</dd>
     </dl>
     <blockquote class="inline_help">
@@ -123,14 +219,14 @@ if (count($_POST)) {
     <dl>
         <dt>&nbsp;</dt>
         <dd>
-			<input id="submit_settings" type="submit" name="#apply" value="Apply" disabled="true">
+			<input id="submit_settings" type="submit" name="#apply" value="Apply">
 			<input type="button" value="Done" onclick="done()">
 		</dd>
     </dl>
 
 </form>
 
-<div id="title2" class="nocontrol">Restore Backup</div>
+<div id="title" class="nocontrol">Restore Backup</div>
 <form name="restore_backup" method="POST">
 	<p></p>
 
@@ -161,12 +257,70 @@ if (count($_POST)) {
 
 <script type="text/javascript">
 	
-	// Make sure the help box popups are set to the right id so when a user clicks the (?) icon it opens the right help box
-	function setHelpBlocks() {
-		var helps = document.getElementsByTagName("blockquote");
-		for(var i = 0; i < helps.length; i++) {
-			helps[i].id = "helpinfo" + i;
-		}	
+	var interval = document.getElementById("backup_interval");
+	var time = document.getElementById("time");
+	var day_of_week = document.getElementById("day_of_week");
+	var day_of_month = document.getElementById("day_of_month");
+	
+	<?php if($time != ""): ?>
+		//Set the time to the value in the settings file
+		var selected_time = "<?php echo $time ?>";
+		var options = time.options;
+		for(var i = 0; i < options.length; i++) {
+			if(options[i].value === selected_time) {
+				options[i].selected = true;
+			}
+		}
+	<?php endif; ?>
+	
+	<?php if($day_of_month != ""): ?>
+		//Set the day of month to the value in the settings file
+		var selected_day_of_month = <?php echo $day_of_month ?>;
+		var options = day_of_month.options;
+		for(var i = 0; i < options.length; i++) {
+			if(parseInt(options[i].value) === selected_day_of_month) {
+				options[i].selected = true;
+			}
+		}
+	<?php endif; ?>
+	
+	<?php if($day_of_week != ""): ?>
+		//Set the day of week to the value in the settings file
+		var selected_day_of_week = <?php echo $day_of_week ?>;
+		var options = day_of_week.options;
+		for(var i = 0; i < options.length; i++) {
+			if(parseInt(options[i].value) === selected_day_of_week) {
+				options[i].selected = true;
+			}
+		}
+	<?php endif; ?>
+	
+	
+	changeBackupInterval();
+	
+	function changeBackupInterval() {
+		
+		switch(interval.value) {
+			case 'daily':
+				time.disabled = false;
+				day_of_week.disabled = true;
+				day_of_month.disabled = true;
+				break;
+			case 'weekly':
+				time.disabled = false;
+				day_of_week.disabled = false;
+				day_of_month.disabled = true;
+				break;
+			case 'monthly':
+				time.disabled = false;
+				day_of_week.disabled = false;
+				day_of_month.disabled = false;
+				break;
+			default:
+				time.disabled = true;
+				day_of_week.disabled = true;
+				day_of_month.disabled = true;
+		}
 	}
 	
 	// When the user clicks 'Add' on the backup location list this adds an input where they can add an extra folder to be backed up
@@ -185,52 +339,15 @@ if (count($_POST)) {
 		var removeButton = document.createElement("button");
 		removeButton.type = "button";
 		removeButton.innerHTML = "Remove";
-		removeButton.onclick = function() {
-			var inputToRemove = this.parentNode;
-			inputToRemove.parentNode.removeChild(inputToRemove);
-		}
+		removeButton.addEventListener("click", removeLocation);
 		container.appendChild(removeButton);
 		
 		list.appendChild(container);
 	}
 	
-	function check_settings_form() {
-		var submitButton = document.getElementById("submit_settings");
-	
-		var formList = [];
-		formList.push(document.getElementById("bucket_type"));
-		formList.push(document.getElementById("api_key"));
-		formList.push(document.getElementById("api_id"));
-		formList.push(document.getElementById("encryption_password"));
-		formList.push(document.getElementById("backup_location_list"));
-		formList.push(document.getElementById("backup_interval"));
-		
-		var formComplete = true;
-		
-		for(var i = 0; i < formList.length; i++) {
-			if(formList[i].id === "backup_location_list") {
-				var isBackupLocation = false;
-				for(var x = 0; i < formList[i].getElementsByTagName("input"); x++) {
-					if(formList[i].getElementsByTagName("input")[x]) {
-						isBackupLocation = true;
-						break;
-					}
-				}
-				if(!isBackupLocation) {
-					formComplete = false;
-				}
-			} else {
-				if(!formList[i].value) {
-					formComplete = false;
-				}
-			}
-		}
-		
-		if(!formComplete) {
-			submitButton.disabled = true;
-		}
+	function removeLocation(el) {
+		var inputToRemove = el.parentNode || this.parentNode;
+		inputToRemove.parentNode.removeChild(inputToRemove);
 	}
-	
-	setHelpBlocks()
 	
 </script>

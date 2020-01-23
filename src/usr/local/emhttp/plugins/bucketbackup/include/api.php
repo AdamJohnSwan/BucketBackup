@@ -14,15 +14,6 @@ function console_log($output, $with_script_tags = true) {
 function update_cron($interval) {
 		global $plugin;
         $cronstring = "";
-        if ($interval == "daily") {
-                $cronstring = "0 4 * * *";
-        }
-        if ($interval == "weekly") {
-                $cronstring = "0 4 * * 1";
-        }
-        if ($interval == "monthly") {
-                $cronstring = "0 4 1 * *";
-        }
         if ($cronstring != "") {
                 shell_exec("mkdir -p /boot/config/plugins/dynamix");
                 shell_exec("touch /boot/config/plugins/dynamix/{$plugin}.cron");
