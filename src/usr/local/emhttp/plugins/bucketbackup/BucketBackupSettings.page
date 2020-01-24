@@ -9,6 +9,9 @@ Title="Bucket Backup"
 
 $plugin = "bucketbackup";
 require_once("/usr/local/emhttp/plugins/{$plugin}/include/api.php");
+require_once("/usr/local/emhttp/plugins/{$plugin}/include/list_backups.php");
+
+$backups = list_backups();
 
 function showSettings($settings) {
 	global $api_id;
@@ -20,6 +23,7 @@ function showSettings($settings) {
 	global $day_of_month;
 	global $bucket_type;
 	global $encryption_password;
+	global $retention;
 	
 	$json = json_decode($settings,true);
 	$api_id = $json["api_id"];
@@ -31,6 +35,7 @@ function showSettings($settings) {
 	$day_of_month = $json["day_of_month"];
 	$bucket_type = $json["bucket_type"];
 	$encryption_password = $json["encryption_password"];
+	$retention = $json["retention"];
 }
 
 $api_id = "";
@@ -42,6 +47,7 @@ $day_of_week = "";
 $day_of_month = "";
 $bucket_type = "";
 $encryption_password = "";
+$retention = "";
 
 if (file_exists("/usr/local/emhttp/plugins/{$plugin}/settings.config")) {
 	showSettings(file_get_contents("/usr/local/emhttp/plugins/{$plugin}/settings.config"));
@@ -59,6 +65,7 @@ if (count($_POST)) {
                 $settingsObj->backup_location = $_POST["backup_location"];
                 $settingsObj->bucket_type = $_POST["bucket_type"];
                 $settingsObj->encryption_password = $_POST["encryption_password"];
+				$settingsObj->retention = $_POST["retention"];
 
                 $settingsJson = json_encode($settingsObj);
 				
@@ -216,6 +223,17 @@ if (count($_POST)) {
         <p>Specify how often you want your files backed up</p>
     </blockquote>
 
+	<dl>
+		<dt style="cursor: help;">Retention Period:</dt>
+		<dd>
+			<input style="width: 50px;" type="text" name="retention" id="retention" value="<?php echo $retention; ?>" ><span>Days</span>
+		</dd>
+	</dl>
+
+	<blockquote class="inline_help">
+        <p>How many days for a backup to be stored before it is deleted</p>
+    </blockquote>
+
     <dl>
         <dt>&nbsp;</dt>
         <dd>
@@ -235,6 +253,10 @@ if (count($_POST)) {
         <dd>
 			<select name="bucket_to_restore" size="1">
 				<option value="" disabled="true">Select...</option>
+				<?php foreach($backups as $key => $backup): ?>
+					<?php $date = date("Y-m-d H:i:s", substr($backup, 0, 10)); ?>
+					<option value="<?php echo $date; ?>"><?php echo $date; ?></option>
+				<?php endforeach; ?> 
 			</select>
 		</dd>
     </dl>

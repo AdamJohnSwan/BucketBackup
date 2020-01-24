@@ -1,0 +1,98 @@
+#!/bin/bash
+
+check_for_bad_request () {
+    if [ $(echo "$1" | jq '.status') != null ];
+    then
+                printf "Backblaze returned error\n"
+                printf "$1" | jq '.'
+                exit 1
+    fi
+}
+
+
+#check if jq is installed
+if ! [ -x "$(command -v jq)" ];
+then
+        echo 'Error: jq is not installed.'
+        exit 1
+fi
+
+cd /usr/local/emhttp/plugins/bucketbackup/
+
+echo "Getting authentication token"
+api_id=$(cat settings.config | jq -r '.api_id')
+api_key=$(cat settings.config | jq -r '.api_key')
+retention=$(cat settings.config | jq -r '.retention')
+retention_in_seconds=$(($retention*24*60*60))
+current_time=$(($(date '+%s%N') / 1000000))
+
+authurl=$(printf "https://api.backblazeb2.com/b2api/v2/")
+
+authresponse=$(curl -s  "${authurl}b2_authorize_account" -u "${api_id}:${api_key}")
+check_for_bad_request "$authresponse"
+
+#response from backblaze that will be used for sending files
+token=$(echo $authresponse | jq -r '.authorizationToken')
+apiurl=$(echo $authresponse | jq -r '.apiUrl')
+apiurl+="/b2api/v2/"
+accountid=$(echo $authresponse | jq -r '.accountId')
+
+echo "Checking if bucketbackup bucket exists"
+bucketname="unraid-bucket-backup"
+list_buckets_response=$(curl -s \
+    -H "Authorization: $token" \
+    -d "{\"accountId\": \"${accountid}\"}" \
+    "${apiurl}b2_list_buckets")
+check_for_bad_request "$list_buckets_response"
+found_bucket=0
+bucketid=0
+for bucket in $(echo "$list_buckets_response" | jq -c '.buckets[]');
+do
+        if [ $(echo $bucket | jq -r '.bucketName') == "$bucketname" ];
+        then
+                found_bucket=1
+        fi
+done
+
+if [ $found_bucket == 1 ];
+then
+        echo "Found bucketbackup's bucket"
+        bucketid=$(echo $bucket | jq -r '.bucketId')
+else
+        echo "bucket backup does not exist on backblaze"
+        exit 1
+fi
+
+# get the full list of files and put the ones that are older than the retention period in an array
+echo "Getting list of files"
+start_file_name=""
+retention_in_milliseconds=$(($retention*24*60*60*1000))
+while [ "$start_file_name" != null ];
+do
+        echo $start_file_name
+        file_list_response=$(curl -s \
+                -H "Authorization: $token" \
+                -d "{\"startFileName\":\"${start_file_name}\",\"bucketId\": \"${bucketid}\"}" \
+                "${apiurl}b2_list_file_names")
+        echo $file_list_response | jq .
+
+        check_for_bad_request "$file_list_response"
+        for file in $(echo "$file_list_response" | jq -c '.files[]');
+        do
+                if [ $(echo $file | jq -r '.uploadTimestamp') -gt $(($retention_in_milliseconds-$current_time)) ];
+                then
+                        # delete an old backup
+                        filename=$(echo $file | jq -r '.fileName')
+                        fileid=$(echo $file | jq -r '.fileId')
+                        delete_file_response=$(curl \
+                                -H "Authorization: $token" \
+                                -d "{\"fileName\": \"${filename}\", \"fileId\": \"${fileid}\"}" \
+                                "${apiurl}b2_delete_file_version")
+                        check_for_bad_request "$deleted_file_response"
+                        echo "Deleted:"
+                        echo $deleted_file_response | jq .
+                fi
+        done
+        start_file_name=$(echo $file_list_response | jq -r '.nextFileName')
+done
+

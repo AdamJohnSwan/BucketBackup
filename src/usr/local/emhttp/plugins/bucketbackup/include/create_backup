@@ -25,8 +25,9 @@ create_encrypted () {
 large_file () {
 	echo "File is greater than 5G. Sending with backblaze large file api"
 	# initiate the large upload
+	filename=$(date +%s)"${enc_backup}"
 	start_large_upload_response=$(curl -s -H "Authorization: $token" \
-	--data "{\"bucketId\": \"${bucketid}\",\"fileName\": \"${enc_backup}\",\"contentType\": \"application/octet-stream\"}" \
+	--data "{\"fileInfo\":{\"backup_job\":${backup_job}},\"bucketId\": \"${bucketid}\",\"fileName\": \"${enc_backup}\",\"contentType\": \"application/octet-stream\"}" \
 	"${apiurl}b2_start_large_file")
 	check_for_bad_request "$start_large_upload_response"
 	large_upload_file_id=$(echo $start_large_upload_response | jq -r '.fileId')
@@ -101,6 +102,7 @@ small_file () {
 	-H "X-Bz-File-Name: $enc_backup" \
 	-H "Content-Type: application/octet-stream" \
 	-H "X-Bz-Content-Sha1: $sha1_of_file" \
+	-H "X-Bz-Info-backup_job: $backup_job" \
 	--data-binary "@$enc_backup" \
 	$uploadurl)
 	check_for_bad_request "$upload_response"
@@ -127,14 +129,14 @@ then
 fi
 
 echo "Getting authentication token"
-app_id=$(cat settings.config | jq -r '.app_id')
-app_key=$(cat settings.config | jq -r '.app_key')
+api_id=$(cat settings.config | jq -r '.api_id')
+api_key=$(cat settings.config | jq -r '.api_key')
 backup_locations=$(cat settings.config | jq '.backup_location')
 bucket_type=$(cat settings.config | jq '.bucket_type')
 encryption_password=$(cat settings.config | jq -r '.encryption_password')
 authurl=$(printf "https://api.backblazeb2.com/b2api/v2/")
 
-authresponse=$(curl -s  "${authurl}b2_authorize_account" -u "${app_id}:${app_key}")
+authresponse=$(curl -s  "${authurl}b2_authorize_account" -u "${api_id}:${api_key}")
 check_for_bad_request "$authresponse"
 
 #response from backblaze that will be used for sending files
@@ -145,16 +147,37 @@ accountid=$(echo $authresponse | jq -r '.accountId')
 size_of_part=$( echo $authresponse | jq -r '.recommendedPartSize')
 minimum_part_size=$( echo $authresponse | jq -r '.absoluteMinimumPartSize')
 
-echo "Creating a bucket to hold the backup"
-#create a new bucket to hold the backup
-# the name contains the current date and time
-bucketname="bucketbackup$(date +"%m-%d-%Y-%H-%M-%S")"
-buckettype="allPrivate"
-bucketcreate_response=$(curl -s -H  "Authorization: $token" \
-	--data "{\"accountId\":\"${accountid}\",\"bucketName\":\"${bucketname}\",\"bucketType\":\"${buckettype}\"}" \
-	"${apiurl}b2_create_bucket")
-check_for_bad_request "$bucketcreate_response"
-bucketid=$(echo $bucketcreate_response | jq -r '.bucketId')
+echo "Checking if bucketbackup bucket exists"
+bucketname="unraid-bucket-backup"
+list_buckets_response=$(curl -s \
+    -H "Authorization: $token" \
+    -d "{\"accountId\": \"${accountid}\"}" \
+    "${apiurl}b2_list_buckets")
+check_for_bad_request "$list_buckets_response"
+found_bucket=0
+bucketid=0
+for bucket in $(echo "$list_buckets_response" | jq -c '.buckets[]');
+do
+	if [ $(echo $bucket | jq -r '.bucketName') == "$bucketname" ];
+	then
+		found_bucket=1
+		bucketid=$(echo $bucket | jq -r '.bucketId')
+	fi
+done 
+
+if [ $found_bucket == 1 ];
+then
+	echo "bucketbackup bucket exists already"
+else
+	echo "Creating a bucket to hold the backup"
+	#create a new bucket to hold the backup
+	buckettype="allPrivate"
+	bucketcreate_response=$(curl -s -H  "Authorization: $token" \
+		--data "{\"accountId\":\"${accountid}\",\"bucketName\":\"${bucketname}\",\"bucketType\":\"${buckettype}\"}" \
+		"${apiurl}b2_create_bucket")
+	check_for_bad_request "$bucketcreate_response"
+	bucketid=$(echo $bucketcreate_response | jq -r '.bucketId')
+fi
 
 #change directory to the array so the storage space on the flash drive isn't completely taken up
 cd /mnt/user/
@@ -167,6 +190,7 @@ cd "$backup_dir"
 
 declare -i filecount=0
 backup="backup${filecount}.tar"
+backup_job=$(date +%s)
 
 for row in $(echo ${backup_locations} | jq -r .[]);
 do
