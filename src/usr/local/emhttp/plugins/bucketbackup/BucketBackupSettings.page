@@ -82,6 +82,18 @@ if (count($_POST)) {
 
 <script type="text/javascript" src="<?autov('/webGui/javascript/jquery.filetree.js')?>"></script>
 <link type="text/css" rel="stylesheet" href="<?autov('/webGui/styles/jquery.filetree.css')?>" >
+
+<style>
+	#restore_output {
+		height: 500px;
+		overflow-y:scroll;
+		background-color:#ffffff;
+		width:90%;
+		margin: 0 auto;
+		display: none;
+	}
+</style>
+
 <script type="text/javascript">
 
 	function openFileBrowser(el) {
@@ -189,7 +201,7 @@ if (count($_POST)) {
 			<input type="text" name="backup_location[]"
 				onclick="openFileBrowser(this);"
 				value="<?php  echo $backup_locations[0] ?>" >
-			<button type="button" onclick="add_backup_location()">Add</button>
+			<button type="button" onclick="addBackupLocation()">Add</button>
 			<? if ($backup_locations != ""): ?>
 				<?php for($i = 1; $i < sizeof($backup_locations); $i++): ?>
 					<div style="margin-left: 35%;">
@@ -245,17 +257,17 @@ if (count($_POST)) {
 </form>
 
 <div id="title" class="nocontrol">Restore Backup</div>
-<form name="restore_backup" method="POST">
+<form name="restore_backup">
 	<p></p>
 
     <dl>
         <dt style="cursor: help;">Backup:</dt>
         <dd>
-			<select name="bucket_to_restore" size="1">
+			<select name="bucket_to_restore" id="bucket_to_restore">
 				<option value="" disabled="true">Select...</option>
 				<?php foreach($backups as $key => $backup): ?>
 					<?php $date = date("Y-m-d H:i:s", substr($backup, 0, 10)); ?>
-					<option value="<?php echo $date; ?>"><?php echo $date; ?></option>
+					<option value="<?php echo $backup; ?>"><?php echo $date; ?></option>
 				<?php endforeach; ?> 
 			</select>
 		</dd>
@@ -266,16 +278,59 @@ if (count($_POST)) {
     </blockquote>
 	
 	<dl>
+		<dt style="cursor: help;">API Key:</dt>
+		<dd>
+			<input type="text" name="api_key_restore" id="api_key_restore" value="<?php echo $api_key; ?>" >
+		</dd>
+	</dl>
+
+	<blockquote class="inline_help">
+        <p>This is your API key. It is used to download your backup</p>
+    </blockquote>
+
+    <dl>
+		<dt style="cursor: help;">API Key ID:</dt>
+		<dd>
+			<input type="text" name="api_id_restore" id="api_id_restore" value="<?php echo $api_id; ?>" >
+		</dd>
+	</dl>
+
+	<blockquote class="inline_help">
+        <p>This is your API Key ID. It is used to download your backup</p>
+    </blockquote>
+	
+	<dl>
+		<dt style="cursor: help;">Encryption password:</dt>
+		<dd>
+			<input type="password" name="encryption_password_restore" id="encryption_password_restore" value="<?php echo $encryption_password; ?>" >
+		</dd>
+	</dl>
+	
+	<blockquote class="inline_help">
+        <p>The password that was used to encrypt the backup.</p>
+    </blockquote>
+	
+	<dl>
 		<dt style="cursor: help;">Restore Location:</dt>
 		<dd>
-			<input type="text" name="restore_location">
+			<input type="text" onclick="openFileBrowser(this)" name="restore_location" id="restore_location">
 		</dd>
 	</dl>
 
 	<blockquote class="inline_help">
         <p>This is the folder that you want to restore your backup files to.</p>
     </blockquote>
+	
+	<dl>
+        <dt>&nbsp;</dt>
+        <dd>
+			<button id="submit_restore" type="button" onclick="restoreBackup()">Restore</button>
+		</dd>
+    </dl>
 </form>
+<div id="restore_output">
+
+</div>
 
 <script type="text/javascript">
 	
@@ -346,7 +401,7 @@ if (count($_POST)) {
 	}
 	
 	// When the user clicks 'Add' on the backup location list this adds an input where they can add an extra folder to be backed up
-	function add_backup_location() {
+	function addBackupLocation() {
 		var list = document.getElementById("backup_location_list");
 		
 		var container = document.createElement("div");
@@ -370,6 +425,49 @@ if (count($_POST)) {
 	function removeLocation(el) {
 		var inputToRemove = el.parentNode || this.parentNode;
 		inputToRemove.parentNode.removeChild(inputToRemove);
+	}
+	
+	function restoreBackup() {
+		var restore_output = document.getElementById("restore_output");
+		restore_output.style.display = "block";
+		
+		var password = document.getElementById("encryption_password_restore");
+		var bucket_info = document.getElementById("bucket_to_restore");
+		var location = document.getElementById("restore_location");
+		var api_id = document.getElementById("api_id_restore");
+		var api_key = document.getElementById("api_key_restore");
+		
+		var password_data = encodeURIComponent(password.value);
+		var bucket_info_data = encodeURIComponent(bucket_info.value);
+		var location_data = encodeURIComponent(location.value);
+		var api_id_data = encodeURIComponent(api_id.value);
+		var api_key_data = encodeURIComponent(api_key.value);
+		var csrf = document.getElementsByName("csrf_token")[0].value;
+		
+		if(typeof(EventSource) === "undefined") {
+			restore_output.innerHTML = "Output from restore is not supported in your browser. The restore has started";
+		} else {
+			window.scrollTo(0, 1000);
+			var prevMessage = "";
+			var source = new EventSource("/plugins/<?php echo $plugin?>/include/restore_backup.php?csrf_token=" + csrf);
+			source.onmessage = function(event) {
+				if(event.data !== prevMessage) {
+					restore_output.innerHTML += event.data + "<br>";
+					prevMessage = event.data;
+				}
+			};
+		}
+		
+		var xhttp = new XMLHttpRequest();
+		xhttp.onreadystatechange = function() {
+			if (this.readyState == 4) {
+				console.log(xhttp.responseText);
+			}
+		};
+		var data = "csrf_token=" + csrf + "&" + password.name + "=" + password_data + "&" + bucket_info.name + "=" + bucket_info_data + "&" + location.name + "=" + location_data + "&" + api_id.name + "=" + api_id_data + "&" + api_key.name + "=" + api_key_data;
+		xhttp.open("POST", "/plugins/<?php echo $plugin; ?>/include/restore_backup.php", true);
+		xhttp.setRequestHeader("Content-Type", "application/x-www-form-urlencoded");
+		xhttp.send("restore=Restore&" + data);
 	}
 	
 </script>

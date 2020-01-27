@@ -29,4 +29,5 @@ function update_settings($settingsJson) {
 		fclose($settings);
 }
 
+
 ?>

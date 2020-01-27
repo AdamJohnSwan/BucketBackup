@@ -69,6 +69,7 @@
 		mkdir -p /tmp/&name;/tempFiles
 		mkdir -p /boot/config/plugins/&name;
 		chmod 700 /usr/local/emhttp/plugins/&name;/include/create_backup
+		chmod 700 /usr/local/emhttp/plugins/&name;/include/delete_old_backups
 		echo ""
 	</INLINE>
 	</FILE>
