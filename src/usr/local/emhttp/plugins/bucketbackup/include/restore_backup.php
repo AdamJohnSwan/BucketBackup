@@ -1,13 +1,31 @@
 <?php
 
+// Send a response back to the user and continue processing the backup
+ignore_user_abort(true);
+set_time_limit(0);
+
+ob_start();
+echo "Restore started";
+header('Connection: close');
+header('Content-Length: '.ob_get_length());
+ob_end_flush();
+ob_flush();
+flush();
+
 if ($_POST['restore'] == "Restore") {
+	
+	//delete the old log file
+	if(file_exists("/tmp/bucketbackup/restore.log")) {
+		unlink("/tmp/bucketbackup/restore.log");
+	}
+	
 	$password = $_POST["encryption_password_restore"];
 	$bucket_info = $_POST["bucket_to_restore"];
 	$location = $_POST["restore_location"];
 	$api_id = $_POST["api_id_restore"];
 	$api_key = $_POST["api_key_restore"];
 	
-	$_SESSION['message'] = "Restore Starting";
+	write_to_log('Restore started at ' . date(DATE_RFC2822));
 	// get the auth token
 	$credentials = base64_encode($api_id . ":" . $api_key);
 	$authurl = "https://api.backblazeb2.com/b2api/v2/b2_authorize_account";
@@ -53,7 +71,7 @@ if ($_POST['restore'] == "Restore") {
 	if($bucketid == 0) {
 			return;
 	}
-	$_SESSION['message'] = "Found bucketbackup's bucket";
+	write_to_log("Found bucketbackup's bucket");
 	//Create temporary folder to house the downloads
 	$download_dir = $location . "bucketbackup_download_dir";
 	if(file_exists($download_dir)) {
@@ -97,26 +115,38 @@ if ($_POST['restore'] == "Restore") {
 				fclose($fp);
 				
 				if($st_code == 200) {
-					$_SESSION['message'] = $file["fileName"] . ' downloaded successfully';
+					write_to_log($file["fileName"] . ' downloaded successfully');
 					//Now to decrypt the file
 					$gzfile = str_replace(".dat", "", $file["fileName"]);
-					$_SESSION['message'] = "Decrypting...";
-					$_SESSION['message'] = shell_exec("openssl enc -aes-256-cbc -pbkdf2 -d -pass pass:{$password} < {$download_dir}/{$file["fileName"]} > {$download_dir}/{$gzfile}");
+					write_to_log("Decrypting...");
+					$message = 
+					write_to_log(shell_exec("openssl enc -aes-256-cbc -pbkdf2 -d -pass pass:{$password} < {$download_dir}/{$file["fileName"]} > {$download_dir}/{$gzfile}"));
 					//Remove the encrypted file
-					$_SESSION['message'] = shell_exec("rm {$download_dir}/{$file["fileName"]}");
+					write_to_log(shell_exec("rm {$download_dir}/{$file["fileName"]}"));
 					//Unzip and untar the file
-					$_SESSION['message'] = shell_exec("tar -xzvf {$download_dir}/{$gzfile} -C {$location}");
+					write_to_log(shell_exec("tar -xzvf {$download_dir}/{$gzfile} -C {$location}"));
 					//Remove the tar file
-					$_SESSION['message'] = shell_exec("rm {$download_dir}/{$gzfile}");
+					write_to_log(shell_exec("rm {$download_dir}/{$gzfile}"));
 				} else {
-					$_SESSION['message'] = 'Error downloading ' . $file["fileName"];
+					write_to_log('Error downloading ' . $file["fileName"]);
 				}
 			}
 		}
 		$start_file = $json["nextFileName"];
 	} while ($start_file != null);
-	$_SESSION['message'] = 'Download finished';
+	write_to_log('Restore finished at ' . date(DATE_RFC2822));
 	exec("rm -r $download_dir");
 }
 
+function write_to_log($message) {
+	$folder = "/tmp/bucketbackup";
+	//Check if tmp directory exists
+	if(!file_exists($folder)) {
+		mkdir($folder);
+	}
+	$logfile = fopen($folder . "/restore.log", "a");
+	fwrite($logfile, $message);
+	fwrite($logfile, "\n");
+	fclose($logfile);
+}
 ?>

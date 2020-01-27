@@ -78,6 +78,27 @@ if (count($_POST)) {
         }
 }
 
+if(file_exists("/tmp/{$plugin}/restore.log")) {
+	$restorelog = file_get_contents("/tmp/{$plugin}/restore.log");
+	
+	// Searches log for last backup started
+	$startedbackup = 'Restore started at';
+	$pattern = preg_quote($startedbackup, '/');
+	$pattern = "/^.*$pattern.*\$/m";
+	if(preg_match_all($pattern, $restorelog, $matches)){
+		$backupstarted = end($matches[0]);
+	}
+	
+	//Searches log for last backup finished
+	$finishedbackup = 'Restore finished at';
+	// escape special characters in the query
+	$pattern = preg_quote($finishedbackup, '/');
+	// finalise the regular expression, matching the whole line
+	$pattern = "/^.*$pattern.*\$/m";
+	if(preg_match_all($pattern, $restorelog, $matches)){
+	   $lastbackup = end($matches[0]);
+	}
+}
 ?>
 
 <script type="text/javascript" src="<?autov('/webGui/javascript/jquery.filetree.js')?>"></script>
@@ -85,12 +106,9 @@ if (count($_POST)) {
 
 <style>
 	#restore_output {
-		height: 500px;
-		overflow-y:scroll;
 		background-color:#ffffff;
 		width:90%;
 		margin: 0 auto;
-		display: none;
 	}
 </style>
 
@@ -328,9 +346,20 @@ if (count($_POST)) {
 		</dd>
     </dl>
 </form>
-<div id="restore_output">
 
+<?php if(isset($backupstarted) && !is_null($backupstarted) && is_null($lastbackup)): ?>
+<div id="restore_output">
+	<?php echo $backupstarted; ?>
 </div>
+<?php endif; ?>
+
+<?php if(isset($lastbackup) && !is_null($lastbackup)): ?>
+<div id="restore_output">
+	<?php echo $lastbackup; ?>
+</div>
+<?php endif; ?>
+
+
 
 <script type="text/javascript">
 	
@@ -428,8 +457,6 @@ if (count($_POST)) {
 	}
 	
 	function restoreBackup() {
-		var restore_output = document.getElementById("restore_output");
-		restore_output.style.display = "block";
 		
 		var password = document.getElementById("encryption_password_restore");
 		var bucket_info = document.getElementById("bucket_to_restore");
@@ -443,20 +470,6 @@ if (count($_POST)) {
 		var api_id_data = encodeURIComponent(api_id.value);
 		var api_key_data = encodeURIComponent(api_key.value);
 		var csrf = document.getElementsByName("csrf_token")[0].value;
-		
-		if(typeof(EventSource) === "undefined") {
-			restore_output.innerHTML = "Output from restore is not supported in your browser. The restore has started";
-		} else {
-			window.scrollTo(0, 1000);
-			var prevMessage = "";
-			var source = new EventSource("/plugins/<?php echo $plugin?>/include/restore_backup.php?csrf_token=" + csrf);
-			source.onmessage = function(event) {
-				if(event.data !== prevMessage) {
-					restore_output.innerHTML += event.data + "<br>";
-					prevMessage = event.data;
-				}
-			};
-		}
 		
 		var xhttp = new XMLHttpRequest();
 		xhttp.onreadystatechange = function() {
