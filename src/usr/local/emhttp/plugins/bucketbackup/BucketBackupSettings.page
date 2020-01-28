@@ -38,6 +38,9 @@ function showSettings($settings) {
 	$retention = $json["retention"];
 }
 
+
+$error = null;
+
 $api_id = "";
 $api_key = "";
 $backup_locations = "";
@@ -67,10 +70,43 @@ if (count($_POST)) {
                 $settingsObj->encryption_password = $_POST["encryption_password"];
 				$settingsObj->retention = $_POST["retention"];
 
-                //Update the cron with the backup schedule
-                update_cron($settingsObj);
-				
-				showSettings(json_encode($settingsObj));
+				// Check form for required values
+				$form_complete = true;
+				foreach ($settingsObj as $key => $value) {
+				  if($key != "time" && $key != "day_of_week" && $key != "day_of_month") {
+					if($value == null) {
+					  $form_complete = false;
+					}
+				  } 
+				}
+
+				// The backup interval must be checked seperately since some of its values can be null
+				if($settingsObj->backup_interval == "daily") {
+				  if($settingsObj->time == null) {
+					$form_complete = false;
+				  }
+				} elseif ($settingsObj->backup_interval == "weekly") {
+				  if($settingsObj->time == null || $settingsObj->day_of_week == null) {
+					$form_complete = false;
+				  }
+				} elseif ($settingsObj->backup_interval == "monthly") {
+				  if($settingsObj->time == null || $settingsObj->day_of_month == null) {
+					$form_complete = false;
+				  }
+				} elseif ($settingsObj->backup_interval == "never") {
+				} else {
+				  $form_complete = false;
+				}
+
+				if(!$form_complete) {
+				  $error = "Please complete the entire settings form";
+				} else {
+					$error = null;
+					//Update the cron with the backup schedule
+					update_cron($settingsObj);
+					showSettings(json_encode($settingsObj));
+				}
+
         }
 }
 
@@ -105,6 +141,10 @@ if(file_exists("/tmp/{$plugin}/restore.log")) {
 		background-color:#ffffff;
 		width:90%;
 		margin: 0 auto;
+	}
+	#form-error {
+		color: red;
+		font-weight: bold;
 	}
 </style>
 
@@ -267,7 +307,9 @@ if(file_exists("/tmp/{$plugin}/restore.log")) {
 			<input type="button" value="Done" onclick="done()">
 		</dd>
     </dl>
-
+	<?php if(isset($error)):?>
+		<span id="form-error"><?php echo $error ?></span>
+	<?php endif; ?>
 </form>
 
 <div id="title" class="nocontrol">Restore Backup</div>
@@ -435,6 +477,9 @@ if(file_exists("/tmp/{$plugin}/restore.log")) {
 		var inputField = document.createElement("input");
 		inputField.type = "text";
 		inputField.name = "backup_location[]";
+		inputField.addEventListener("click", function() {
+			openFileBrowser(this);
+		});
 		
 		container.appendChild(inputField);
 		
