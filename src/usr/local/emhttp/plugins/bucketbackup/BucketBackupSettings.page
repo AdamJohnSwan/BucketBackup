@@ -70,7 +70,7 @@ if (count($_POST)) {
                 //Update the cron with the backup schedule
                 update_cron($settingsObj);
 				
-				showSettings(json_decode($settingsObj);
+				showSettings(json_encode($settingsObj));
         }
 }
 
@@ -415,7 +415,7 @@ if(file_exists("/tmp/{$plugin}/restore.log")) {
 				break;
 			case 'monthly':
 				time.disabled = false;
-				day_of_week.disabled = false;
+				day_of_week.disabled = true;
 				day_of_month.disabled = false;
 				break;
 			default:

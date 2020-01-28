@@ -30,12 +30,12 @@ function update_cron($settings) {
 			$hour = $time[0];
 			$minute = $time[1];
 			$day_of_week = parse_week($settings->day_of_week);
+			$day_of_month = "*";
 			break;
 		case "monthly":
 			$time = parse_time($settings->time);
 			$hour = $time[0];
 			$minute = $time[1];
-			$day_of_week = parse_week($settings->day_of_week);
 			$day_of_month = parse_month($settings->day_of_month);
 			break;
 	}
@@ -56,11 +56,11 @@ function update_cron($settings) {
 	
 	shell_exec("update_cron");
 	
-	update_settings(json_decode($settings));
+	update_settings(json_encode($settings));
 }
 
 function parse_time($time) {
-	$time = preg_split("/[:]+/", $settings->time);
+	$time = preg_split("/[:]+/", $time);
 	//This is the hour. Make sure it is a number. It will never be zero
 	$hour = intval($time[0]);
 	if($hour < 0 || $hour > 23) {
