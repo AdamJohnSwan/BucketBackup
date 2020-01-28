@@ -114,10 +114,10 @@
 	<option value="23:30">11:30 PM</option>
 	<option value="23:45">11:45 PM</option>
 	
-	<option value="24:00">12:00 PM</option>
-	<option value="24:15">12:15 PM</option>
-	<option value="24:30">12:30 PM</option>
-	<option value="24:45">12:45 PM</option>
+	<option value="00:00">12:00 AM</option>
+	<option value="00:15">12:15 AM</option>
+	<option value="00:30">12:30 AM</option>
+	<option value="00:45">12:45 AM</option>
 	
 </select>
 
@@ -128,7 +128,7 @@
     <option  value='4'>Thursday</option>
     <option  value='5'>Friday</option>
     <option  value='6'>Saturday</option>
-    <option  value='7'>Sunday</option>
+    <option  value='0'>Sunday</option>
 </select>
 
 <select name="day_of_month" id="day_of_month">

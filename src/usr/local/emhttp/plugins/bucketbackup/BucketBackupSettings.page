@@ -67,14 +67,10 @@ if (count($_POST)) {
                 $settingsObj->encryption_password = $_POST["encryption_password"];
 				$settingsObj->retention = $_POST["retention"];
 
-                $settingsJson = json_encode($settingsObj);
-				
-				//Update the settings config file
-				update_settings($settingsJson);
                 //Update the cron with the backup schedule
-                update_cron($_POST["backup_interval"]);
+                update_cron($settingsObj);
 				
-				showSettings($settingsJson);
+				showSettings(json_decode($settingsObj);
         }
 }
 
