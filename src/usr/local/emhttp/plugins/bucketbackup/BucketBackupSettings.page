@@ -104,6 +104,13 @@ if (count($_POST)) {
 					$error = null;
 					//Update the cron with the backup schedule
 					update_cron($settingsObj);
+					// Make the directory to hold the log files
+					exec("mkdir -p /tmp/{$plugin}");
+					//Start a backup if the checkbox was clicked
+					if($_POST["create-backup-now"]) {
+						exec("/usr/local/emhttp/plugins/{$plugin}/include/create_backup >> /tmp/{$plugin}/backup.log 2>&1 &");
+					}
+					
 					showSettings(json_encode($settingsObj));
 				}
 
@@ -113,21 +120,35 @@ if (count($_POST)) {
 if(file_exists("/tmp/{$plugin}/restore.log")) {
 	$restorelog = file_get_contents("/tmp/{$plugin}/restore.log");
 	
-	// Searches log for last backup started
-	$startedbackup = 'Restore started at';
-	$pattern = preg_quote($startedbackup, '/');
+	// Searches log for last restore started
+	$pattern = preg_quote('Restore started at', '/');
 	$pattern = "/^.*$pattern.*\$/m";
 	if(preg_match_all($pattern, $restorelog, $matches)){
+		$restorestarted = end($matches[0]);
+	}
+	
+	//Searches log for last restore finished
+	$pattern = preg_quote('Restore finished at', '/');
+	$pattern = "/^.*$pattern.*\$/m";
+	if(preg_match_all($pattern, $restorelog, $matches)){
+	   $lastrestore = end($matches[0]);
+	}
+}
+
+if(file_exists("/tmp/{$plugin}/backup.log")) {
+	$backuplog = file_get_contents("/tmp/{$plugin}/backup.log");
+	
+	// Searches log for last backup started
+	$pattern = preg_quote('Backup started at', '/');
+	$pattern = "/^.*$pattern.*\$/m";
+	if(preg_match_all($pattern, $backuplog, $matches)){
 		$backupstarted = end($matches[0]);
 	}
 	
-	//Searches log for last backup finished
-	$finishedbackup = 'Restore finished at';
-	// escape special characters in the query
-	$pattern = preg_quote($finishedbackup, '/');
-	// finalise the regular expression, matching the whole line
+	// Searches log for last backup finished
+	$pattern = preg_quote('Backup finished at', '/');
 	$pattern = "/^.*$pattern.*\$/m";
-	if(preg_match_all($pattern, $restorelog, $matches)){
+	if(preg_match_all($pattern, $backuplog, $matches)){
 	   $lastbackup = end($matches[0]);
 	}
 }
@@ -137,7 +158,7 @@ if(file_exists("/tmp/{$plugin}/restore.log")) {
 <link type="text/css" rel="stylesheet" href="<?autov('/webGui/styles/jquery.filetree.css')?>" >
 
 <style>
-	#restore_output {
+	.log-output {
 		background-color:#ffffff;
 		width:90%;
 		margin: 0 auto;
@@ -305,12 +326,26 @@ if(file_exists("/tmp/{$plugin}/restore.log")) {
         <dd>
 			<input id="submit_settings" type="submit" name="#apply" value="Apply">
 			<input type="button" value="Done" onclick="done()">
+			<input type="checkbox" name="create-backup-now">
+			<label for="create-backup-now">Create Backup Now</label>
 		</dd>
     </dl>
 	<?php if(isset($error)):?>
 		<span id="form-error"><?php echo $error ?></span>
 	<?php endif; ?>
 </form>
+
+<?php if(isset($backupstarted) && !is_null($backupstarted) && is_null($lastbackup)): ?>
+<div class="log-output">
+	<?php echo $backupstarted; ?>
+</div>
+<?php endif; ?>
+
+<?php if(isset($lastbackup) && !is_null($lastbackup)): ?>
+<div class="log-output">
+	<?php echo $lastbackup; ?>
+</div>
+<?php endif; ?>
 
 <div id="title" class="nocontrol">Restore Backup</div>
 <form name="restore_backup">
@@ -385,15 +420,15 @@ if(file_exists("/tmp/{$plugin}/restore.log")) {
     </dl>
 </form>
 
-<?php if(isset($backupstarted) && !is_null($backupstarted) && is_null($lastbackup)): ?>
-<div id="restore_output">
-	<?php echo $backupstarted; ?>
+<?php if(isset($restorestarted) && !is_null($restorestarted) && is_null($lastrestore)): ?>
+<div class="log-output">
+	<?php echo $restorestarted; ?>
 </div>
 <?php endif; ?>
 
-<?php if(isset($lastbackup) && !is_null($lastbackup)): ?>
-<div id="restore_output">
-	<?php echo $lastbackup; ?>
+<?php if(isset($lastrestore) && !is_null($lastrestore)): ?>
+<div class="log-output">
+	<?php echo $lastrestore; ?>
 </div>
 <?php endif; ?>
 

@@ -46,11 +46,11 @@ function update_cron($settings) {
 	$cronfile = fopen("/boot/config/plugins/dynamix/{$plugin}.cron", "w");
 	// Add the scheduled job to delete old backups
 	fwrite($cronfile, "# Check for and delete old backups at 3:25AM \n");
-	fwrite($cronfile, "25 3 * * * /usr/local/emhttp/plugins/{$plugin}/include/delete_old_backups \n");
+	fwrite($cronfile, "25 3 * * * /usr/local/emhttp/plugins/{$plugin}/include/delete_old_backups >> /tmp/{$plugin}/delete.log 2>&1 \n");
 	if($settings->backup_interval != "never") {
 		// Add the scheduled job to create new backups
 		fwrite($cronfile, "# Create a new backup \n");
-		fwrite($cronfile, "{$cronstring} /usr/local/emhttp/plugins/{$plugin}/include/create_backup \n");
+		fwrite($cronfile, "{$cronstring} /usr/local/emhttp/plugins/{$plugin}/include/create_backup >> /tmp/{$plugin}/backup.log 2>&1 \n");
 	}
 	fclose($cronfile);
 	

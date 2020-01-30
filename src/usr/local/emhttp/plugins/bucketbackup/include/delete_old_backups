@@ -23,7 +23,6 @@ echo "Getting authentication token"
 api_id=$(cat settings.config | jq -r '.api_id')
 api_key=$(cat settings.config | jq -r '.api_key')
 retention=$(cat settings.config | jq -r '.retention')
-retention_in_seconds=$(($retention*24*60*60))
 current_time=$(($(date '+%s%N') / 1000000))
 
 authurl=$(printf "https://api.backblazeb2.com/b2api/v2/")

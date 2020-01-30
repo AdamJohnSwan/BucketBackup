@@ -1,16 +1,14 @@
 #!/bin/bash
 
 create_encrypted () {
-	# file is now a gz file
-	gzip $backup
-	enc_backup="${backup}.gz.dat"
+	enc_backup="${backup}.dat"
 	# encrypt it
 	openssl enc -aes-256-cbc -pbkdf2 -e -pass pass:$encryption_password \
-	< "${backup}.gz" \
+	< "${backup}" \
 	> $enc_backup
 	#delete the tar.gz file
-	rm "${backup}.gz"
-	echo "Sending backup $filecount to backblaze"
+	rm "${backup}"
+	echo "Sending backup $archivecount to backblaze"
 	#check if file is great than 5G
 	if [ $(du -s -B1 $enc_backup | awk '{ print $1 }') -gt 5000000000 ];
 	then
@@ -41,12 +39,12 @@ large_file () {
 	large_upload_token=$(echo $large_upload_url_response | jq -r '.authorizationToken')
 	large_upload_url=$(echo $large_upload_url_response | jq -r '.uploadUrl')
 
-	# Prepare the large file be spliting it into chunks
+	# Prepare the large file be split into chunks
 	echo "splitting large file into parts"
 	split -b $size_of_part $enc_backup bz_chunk_
 	chunk_names=$(ls -1 bz_chunk_*)
 
-	# Upload file
+	# Upload the file parts
 	part_no=1;
 	part_sha1_array=();
 	for chunk in $chunk_names;
@@ -68,7 +66,6 @@ large_file () {
 	done
 	
 	#Tell backblaze that the file has finished uploading
-	# Create JSON
 	JSON='{ "partSha1Array":[';
 	for sha1 in "${part_sha1_array[@]}"; do
 		JSON+="\"$sha1\",";
@@ -87,6 +84,7 @@ large_file () {
 }
 
 small_file () {
+	filename=$(date +%s)"${enc_backup}"
 	# get the url to upload the data to
 	uploadurl_response=$(curl -s -H "Authorization: $token" \
 	--data "{\"bucketId\": \"${bucketid}\"}" "${apiurl}b2_get_upload_url")
@@ -99,7 +97,7 @@ small_file () {
 	# upload the file
 	upload_response=$(curl -s -T "$enc_backup" -X POST\
 	-H "Authorization: $uploadtoken" \
-	-H "X-Bz-File-Name: $enc_backup" \
+	-H "X-Bz-File-Name: $filename" \
 	-H "Content-Type: application/octet-stream" \
 	-H "X-Bz-Content-Sha1: $sha1_of_file" \
 	-H "X-Bz-Info-backup_job: $backup_job" \
@@ -115,16 +113,19 @@ check_for_bad_request () {
     then
 		printf "Backblaze returned error\n"
 		printf "$1" | jq '.'
+		printf "Backup failed at" $(date)
 		exit 1
     fi
 }
 
+echo "Backup started at" $(date)
 cd /usr/local/emhttp/plugins/bucketbackup/
 
 #check if jq is installed
 if ! [ -x "$(command -v jq)" ]; 
 then
 	echo 'Error: jq is not installed.'
+	echo "Backup failed at" $(date)
 	exit 1
 fi
 
@@ -139,7 +140,7 @@ authurl=$(printf "https://api.backblazeb2.com/b2api/v2/")
 authresponse=$(curl -s  "${authurl}b2_authorize_account" -u "${api_id}:${api_key}")
 check_for_bad_request "$authresponse"
 
-#response from backblaze that will be used for sending files
+#response from backblaze authentication that will be used for sending files
 token=$(echo $authresponse | jq -r '.authorizationToken')
 apiurl=$(echo $authresponse | jq -r '.apiUrl')
 apiurl+="/b2api/v2/"
@@ -167,10 +168,10 @@ done
 
 if [ $found_bucket == 1 ];
 then
-	echo "bucketbackup bucket exists already"
+	echo "Bucketbackup bucket exists already"
 else
 	echo "Creating a bucket to hold the backup"
-	#create a new bucket to hold the backup
+	#create a new bucket to hold the backups
 	buckettype="allPrivate"
 	bucketcreate_response=$(curl -s -H  "Authorization: $token" \
 		--data "{\"accountId\":\"${accountid}\",\"bucketName\":\"${bucketname}\",\"bucketType\":\"${buckettype}\"}" \
@@ -179,7 +180,7 @@ else
 	bucketid=$(echo $bucketcreate_response | jq -r '.bucketId')
 fi
 
-#change directory to the array so the storage space on the flash drive isn't completely taken up
+#change directory to the disk array so the storage space on the flash drive isn't completely taken up
 cd /mnt/user/
 backup_dir=bucketbackup_archive_dir
 if test -d "$backup_dir"; then
@@ -188,44 +189,52 @@ fi
 mkdir "$backup_dir"
 cd "$backup_dir"
 
+# used to keep track of the number of archives in a backup
+declare -i archivecount=0
+# used to determine the file size of a single archive
+declare -i filesize=0
 declare -i filecount=0
-backup="backup${filecount}.tar"
+backup="backup${archivecount}.tar.gz"
 backup_job=$(date +%s)
 
 for row in $(echo ${backup_locations} | jq -r .[]);
 do
 	echo "Backing up $row"
-	target=$(echo ${row} | sed '/^\// s/.//')
 	while IFS= read -d '' -r file; do
-		target=$(echo "${file}" | sed '/^\// s/.//')
-		if test -f $backup;
+		# Appending files to an existing archive does not work in unraid's shfs filesystem
+		# So each filename is added to a file that will be prepended to the end of the tar command
+		echo "$file" >> "tarfiles${archivecount}"
+		# Get the file size of this file and add it to the accumalated file size. Once it reaches a certain limit then create an archive
+		let filesize+=$(wc -c < "${file}")
+		let filecount+=1
+		# try to split the archive into 2GB parts. Or if there are more than 2000 files already then create a new archive
+		if [ $filesize -gt 2000000000 ] || [ $filecount -gt 20000 ];
 		then
-			#append to the current backup
-			tar rf $backup -C / "$target"
-		else
-			# create a new tar file
-			tar cf $backup -C / "$target"
-		fi
-		
-		# try to split the backup into 2GB parts
-		if [ $(du -s -B1 $backup | awk '{ print $1 }') -gt 2000000000 ];
-		then
-			echo "creating archive of backup $filecount"
+			echo "creating archive of backup $archivecount"
+			tar czf $backup -T "tarfiles${archivecount}"
 			# archive size has been reached. gzip it, encrypt it and send it by either backblazes regular or large file upload routine
 			create_encrypted
 			#since the previous batch of files have been uploaded, move on to the next
-			filecount+=1
-			backup="backup${filecount}.tar"
+			let archivecount+=1
+			backup="backup${archivecount}.tar.gz"
+			# reset everything back to zero for the next archive
+			filecount=0
+			files=""
+			filesize=0
 		fi
 	done < <(find ${row} -type f -follow -print0)
 done
 
-# check to see if backup file still exists. If it does then there are still some more files that need to be uploaded
-if test -f $backup;
+# check to see if the list of files still exists. If it does then there are still some more files that need to be uploaded
+if test -f "tarfiles${archivecount}";
 then
+	echo "creating archive of backup $archivecount"
+	tar czf $backup -T "tarfiles${archivecount}"
 	create_encrypted
 fi
 
 #remove temporary backup dir
 cd ../
 rm -r "$backup_dir"
+
+echo "Backup finished at" $(date)

@@ -14,11 +14,6 @@ flush();
 
 if ($_POST['restore'] == "Restore") {
 	
-	//delete the old log file
-	if(file_exists("/tmp/bucketbackup/restore.log")) {
-		unlink("/tmp/bucketbackup/restore.log");
-	}
-	
 	$password = $_POST["encryption_password_restore"];
 	$bucket_info = $_POST["bucket_to_restore"];
 	$location = $_POST["restore_location"];
@@ -124,7 +119,7 @@ if ($_POST['restore'] == "Restore") {
 					//Remove the encrypted file
 					write_to_log(shell_exec("rm {$download_dir}/{$file["fileName"]}"));
 					//Unzip and untar the file
-					write_to_log(shell_exec("tar -xzvf {$download_dir}/{$gzfile} -C {$location}"));
+					write_to_log(shell_exec("tar -xzf {$download_dir}/{$gzfile} -C {$location}"));
 					//Remove the tar file
 					write_to_log(shell_exec("rm {$download_dir}/{$gzfile}"));
 				} else {
@@ -144,7 +139,7 @@ function write_to_log($message) {
 	if(!file_exists($folder)) {
 		mkdir($folder);
 	}
-	$logfile = fopen($folder . "/restore.log", "a");
+	$logfile = fopen($folder . "/restore.log", "w");
 	fwrite($logfile, $message);
 	fwrite($logfile, "\n");
 	fclose($logfile);
