@@ -78,12 +78,12 @@ do
         check_for_bad_request "$file_list_response"
         for file in $(echo "$file_list_response" | jq -c '.files[]');
         do
-                if [ $(echo $file | jq -r '.uploadTimestamp') -gt $(($retention_in_milliseconds-$current_time)) ];
+                if [ $(echo $file | jq -r '.uploadTimestamp') -lt $(($current_time-$retention_in_milliseconds)) ];
                 then
                         # delete an old backup
                         filename=$(echo $file | jq -r '.fileName')
                         fileid=$(echo $file | jq -r '.fileId')
-                        delete_file_response=$(curl \
+                        delete_file_response=$(curl -s \
                                 -H "Authorization: $token" \
                                 -d "{\"fileName\": \"${filename}\", \"fileId\": \"${fileid}\"}" \
                                 "${apiurl}b2_delete_file_version")
