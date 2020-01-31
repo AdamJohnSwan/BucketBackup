@@ -58,80 +58,81 @@ if (file_exists("/usr/local/emhttp/plugins/{$plugin}/settings.config")) {
 
 if (count($_POST)) {
         if ($_POST['#apply'] == "Apply") {
-                $settingsObj = new \stdClass();
-                $settingsObj->api_id = $_POST["api_id"];
-                $settingsObj->api_key = $_POST["api_key"];
-                $settingsObj->backup_interval = $_POST["backup_interval"];
-				$settingsObj->time = $_POST["time"];
-				$settingsObj->day_of_week = $_POST["day_of_week"];
-				$settingsObj->day_of_month = $_POST["day_of_month"];
-                $settingsObj->backup_location = $_POST["backup_location"];
-                $settingsObj->bucket_type = $_POST["bucket_type"];
-                $settingsObj->encryption_password = $_POST["encryption_password"];
-				$settingsObj->retention = $_POST["retention"];
+			$settingsObj = new \stdClass();
+			$settingsObj->api_id = $_POST["api_id"];
+			$settingsObj->api_key = $_POST["api_key"];
+			$settingsObj->backup_interval = $_POST["backup_interval"];
+			$settingsObj->time = $_POST["time"];
+			$settingsObj->day_of_week = $_POST["day_of_week"];
+			$settingsObj->day_of_month = $_POST["day_of_month"];
+			$settingsObj->backup_location = $_POST["backup_location"];
+			$settingsObj->bucket_type = $_POST["bucket_type"];
+			$settingsObj->encryption_password = $_POST["encryption_password"];
+			$settingsObj->retention = $_POST["retention"];
 
-				// Check form for required values
-				$form_complete = true;
-				foreach ($settingsObj as $key => $value) {
-				  if($key != "time" && $key != "day_of_week" && $key != "day_of_month") {
-					if($value == null) {
-					  $form_complete = false;
-					}
-				  } 
-				}
-
-				// The backup interval must be checked seperately since some of its values can be null
-				if($settingsObj->backup_interval == "daily") {
-				  if($settingsObj->time == null) {
-					$form_complete = false;
-				  }
-				} elseif ($settingsObj->backup_interval == "weekly") {
-				  if($settingsObj->time == null || $settingsObj->day_of_week == null) {
-					$form_complete = false;
-				  }
-				} elseif ($settingsObj->backup_interval == "monthly") {
-				  if($settingsObj->time == null || $settingsObj->day_of_month == null) {
-					$form_complete = false;
-				  }
-				} elseif ($settingsObj->backup_interval == "never") {
-				} else {
+			// Check form for required values
+			$form_complete = true;
+			foreach ($settingsObj as $key => $value) {
+			  if($key != "time" && $key != "day_of_week" && $key != "day_of_month") {
+				if($value == null) {
 				  $form_complete = false;
 				}
+			  } 
+			}
 
-				if(!$form_complete) {
-				  $error = "Please complete the entire settings form";
-				} else {
-					$error = null;
-					//Update the cron with the backup schedule
-					update_cron($settingsObj);
-					// Make the directory to hold the log files
-					exec("mkdir -p /tmp/{$plugin}");
-					//Start a backup if the checkbox was clicked
-					if($_POST["create-backup-now"]) {
-						exec("/usr/local/emhttp/plugins/{$plugin}/include/create_backup >> /tmp/{$plugin}/backup.log 2>&1 &");
-					}
-					
-					showSettings(json_encode($settingsObj));
+			// The backup interval must be checked seperately since some of its values can be null
+			if($settingsObj->backup_interval == "daily") {
+			  if($settingsObj->time == null) {
+				$form_complete = false;
+			  }
+			} elseif ($settingsObj->backup_interval == "weekly") {
+			  if($settingsObj->time == null || $settingsObj->day_of_week == null) {
+				$form_complete = false;
+			  }
+			} elseif ($settingsObj->backup_interval == "monthly") {
+			  if($settingsObj->time == null || $settingsObj->day_of_month == null) {
+				$form_complete = false;
+			  }
+			} elseif ($settingsObj->backup_interval == "never") {
+			} else {
+			  $form_complete = false;
+			}
+
+			if(!$form_complete) {
+			  $error = "Please complete the entire settings form";
+			} else {
+				$error = null;
+				//Update the cron with the backup schedule
+				update_cron($settingsObj);
+				// Make the directory to hold the log files
+				exec("mkdir -p /tmp/{$plugin}");
+				//Start a backup if the checkbox was clicked
+				if($_POST["create-backup-now"]) {
+					exec("/usr/local/emhttp/plugins/{$plugin}/include/create_backup >> /tmp/{$plugin}/backup.log 2>&1 &");
 				}
-
+				
+				showSettings(json_encode($settingsObj));
+			}
         }
 }
 
 if(file_exists("/tmp/{$plugin}/restore.log")) {
+
 	$restorelog = file_get_contents("/tmp/{$plugin}/restore.log");
 	
-	// Searches log for last restore started
-	$pattern = preg_quote('Restore started at', '/');
-	$pattern = "/^.*$pattern.*\$/m";
-	if(preg_match_all($pattern, $restorelog, $matches)){
-		$restorestarted = end($matches[0]);
-	}
-	
-	//Searches log for last restore finished
+	// Searches log for last restore finished. If it doesn't find it in the logs then it searches for the last restore started
 	$pattern = preg_quote('Restore finished at', '/');
 	$pattern = "/^.*$pattern.*\$/m";
 	if(preg_match_all($pattern, $restorelog, $matches)){
-	   $lastrestore = end($matches[0]);
+		$restoremessage = end($matches[0]);
+		if(is_null($restoremessage)) {
+			//Searches log for last restore started 
+			$pattern = preg_quote('Restore started at', '/');
+			$pattern = "/^.*$pattern.*\$/m";
+			if(preg_match_all($pattern, $restorelog, $matches)){
+			   $restoremessage = end($matches[0]);
+			}
+		}
 	}
 }
 
@@ -215,8 +216,36 @@ if(file_exists("/tmp/{$plugin}/backup.log")) {
 		// Open fileTree
 		ft.slideDown('fast');
 	} 
+	
+	function getLogContents(logname) {
+		var csrf = document.getElementsByName("csrf_token")[0].value;
+		var xhttp = new XMLHttpRequest();
+		var wnd = window.open("about:blank");
+		xhttp.onreadystatechange = function() {
+			if (this.readyState == 4) {
+				wnd.document.write(xhttp.responseText);
+			}
+		};
+		var data = "csrf_token=" + csrf + "&" + "logtype=" + logname;
+		xhttp.open("POST", "/plugins/<?php echo $plugin; ?>/include/log.php", true);
+		xhttp.setRequestHeader("Content-Type", "application/x-www-form-urlencoded");
+		xhttp.send(data);
+	}
 </script>
 
+<div class="log-container">
+	<?php if(file_exists("/tmp/{$plugin}/backup.log")): ?>
+		<button onclick="getLogContents('backup')" type="button">Backup Log</button>
+	<?php endif; ?>
+	
+	<?php if(file_exists("/tmp/{$plugin}/restore.log")): ?>
+		<button onclick="getLogContents('restore')" type="button">Restore Log</button>
+	<?php endif; ?>
+	
+	<?php if(file_exists("/tmp/{$plugin}/delete.log")): ?>
+		<button onclick="getLogContents('delete')" type="button">Delete Log</button>
+	<?php endif; ?>
+</div>
 
 <div id="title" class="nocontrol">Common Settings</div>
 <form name="common_settings" method="POST">
@@ -335,15 +364,15 @@ if(file_exists("/tmp/{$plugin}/backup.log")) {
 	<?php endif; ?>
 </form>
 
-<?php if(isset($backupstarted) && !is_null($backupstarted) && is_null($lastbackup)): ?>
+<?php if(isset($backupstarted) && !is_null($backupstarted)): ?>
 <div class="log-output">
-	<?php echo $backupstarted; ?>
+	<span>Last <?php echo $backupstarted; ?></span>
 </div>
 <?php endif; ?>
 
 <?php if(isset($lastbackup) && !is_null($lastbackup)): ?>
 <div class="log-output">
-	<?php echo $lastbackup; ?>
+	<span>Last <?php echo $lastbackup; ?></span>
 </div>
 <?php endif; ?>
 
@@ -420,19 +449,11 @@ if(file_exists("/tmp/{$plugin}/backup.log")) {
     </dl>
 </form>
 
-<?php if(isset($restorestarted) && !is_null($restorestarted) && is_null($lastrestore)): ?>
+<?php if(isset($restoremessage) && !is_null($restoremessage)): ?>
 <div class="log-output">
-	<?php echo $restorestarted; ?>
+	<span><?php echo $restoremessage; ?></span>
 </div>
 <?php endif; ?>
-
-<?php if(isset($lastrestore) && !is_null($lastrestore)): ?>
-<div class="log-output">
-	<?php echo $lastrestore; ?>
-</div>
-<?php endif; ?>
-
-
 
 <script type="text/javascript">
 	

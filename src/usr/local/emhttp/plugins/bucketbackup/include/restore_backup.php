@@ -14,6 +14,11 @@ flush();
 
 if ($_POST['restore'] == "Restore") {
 	
+	//delete the old log file
+	if(file_exists("/tmp/bucketbackup/restore.log")) {
+		unlink("/tmp/bucketbackup/restore.log");
+	}
+	
 	$password = $_POST["encryption_password_restore"];
 	$bucket_info = $_POST["bucket_to_restore"];
 	$location = $_POST["restore_location"];
@@ -139,7 +144,7 @@ function write_to_log($message) {
 	if(!file_exists($folder)) {
 		mkdir($folder);
 	}
-	$logfile = fopen($folder . "/restore.log", "w");
+	$logfile = fopen($folder . "/restore.log", "a");
 	fwrite($logfile, $message);
 	fwrite($logfile, "\n");
 	fclose($logfile);
