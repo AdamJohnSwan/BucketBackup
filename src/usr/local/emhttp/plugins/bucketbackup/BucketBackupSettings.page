@@ -164,7 +164,7 @@ if(file_exists("/tmp/{$plugin}/backup.log")) {
 		width:90%;
 		margin: 0 auto;
 	}
-	#form-error {
+	.form-error {
 		color: red;
 		font-weight: bold;
 	}
@@ -360,7 +360,7 @@ if(file_exists("/tmp/{$plugin}/backup.log")) {
 		</dd>
     </dl>
 	<?php if(isset($error)):?>
-		<span id="form-error"><?php echo $error ?></span>
+		<span class="form-error"><?php echo $error ?></span>
 	<?php endif; ?>
 </form>
 
@@ -447,6 +447,10 @@ if(file_exists("/tmp/{$plugin}/backup.log")) {
 			<button id="submit_restore" type="button" onclick="restoreBackup()">Restore</button>
 		</dd>
     </dl>
+	
+	<div id="restore-response-container">
+
+	</div>
 </form>
 
 <?php if(isset($restoremessage) && !is_null($restoremessage)): ?>
@@ -571,9 +575,20 @@ if(file_exists("/tmp/{$plugin}/backup.log")) {
 		var xhttp = new XMLHttpRequest();
 		xhttp.onreadystatechange = function() {
 			if (this.readyState == 4) {
-				console.log(xhttp.responseText);
+				//Write the response to the page so the user can see if it was succesful
+				var res_container = document.getElementById("restore-response-container");
+				var res = document.createElement("span");
+				res.innerHTML = xhttp.responseText;
+				if(this.status != 200) {
+					res.className = "form-error";
+				}
+				res_container.appendChild(res);
 			}
 		};
+		
+		//Disable the restore button so the user doesn't click it twice
+		document.getElementById("submit_restore").disabled = true;
+		
 		var data = "csrf_token=" + csrf + "&" + password.name + "=" + password_data + "&" + bucket_info.name + "=" + bucket_info_data + "&" + location.name + "=" + location_data + "&" + api_id.name + "=" + api_id_data + "&" + api_key.name + "=" + api_key_data;
 		xhttp.open("POST", "/plugins/<?php echo $plugin; ?>/include/restore_backup.php", true);
 		xhttp.setRequestHeader("Content-Type", "application/x-www-form-urlencoded");
