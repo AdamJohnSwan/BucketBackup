@@ -78,7 +78,7 @@
 			removepkg &name;-&version;-x86_64-1
 			rm -rf &plugdir;
 			rm -rf /tmp/&name;/
-			rm -rf bucketbackup_archive_dir
+			rm -rf /mnt/user/bucketbackup_archive_dir
 			rm -rf /boot/config/plugins/&name;
 			rm /boot/config/plugins/dynamix/&name;.cron
 			update_cron;

@@ -52,8 +52,8 @@ $bucket_type = "";
 $encryption_password = "";
 $retention = "";
 
-if (file_exists("/usr/local/emhttp/plugins/{$plugin}/settings.config")) {
-	showSettings(file_get_contents("/usr/local/emhttp/plugins/{$plugin}/settings.config"));
+if (file_exists("/boot/config/plugins/{$plugin}/settings.config")) {
+	showSettings(file_get_contents("/boot/config/plugins/{$plugin}/settings.config"));
 }
 
 if (count($_POST)) {

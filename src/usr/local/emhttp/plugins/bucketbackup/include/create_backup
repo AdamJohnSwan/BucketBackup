@@ -119,12 +119,20 @@ check_for_bad_request () {
 }
 
 echo "Backup started at" $(date)
-cd /usr/local/emhttp/plugins/bucketbackup/
+cd /boot/config/plugins/bucketbackup/
 
 #check if jq is installed
 if ! [ -x "$(command -v jq)" ]; 
 then
 	echo 'Error: jq is not installed.'
+	echo "Backup failed at" $(date)
+	exit 1
+fi
+
+# make sure that a settings file exists before trying to initiate a backup
+if [ ! -f settings.config ];
+then
+	echo 'Error: settings file does not exist.'
 	echo "Backup failed at" $(date)
 	exit 1
 fi

@@ -91,7 +91,7 @@ function parse_month($day_of_month) {
 
 function update_settings($settingsJson) {
 		global $plugin;
-		$settings = fopen("/usr/local/emhttp/plugins/{$plugin}/settings.config", "w");
+		$settings = fopen("/boot/config/plugins/{$plugin}/settings.config", "w");
 		fwrite($settings, $settingsJson);
 		fclose($settings);
 }

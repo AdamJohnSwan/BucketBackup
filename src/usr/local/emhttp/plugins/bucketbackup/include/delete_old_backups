@@ -17,7 +17,7 @@ then
         exit 1
 fi
 
-cd /usr/local/emhttp/plugins/bucketbackup/
+cd /boot/config/plugins/bucketbackup/
 
 echo "Getting authentication token"
 api_id=$(cat settings.config | jq -r '.api_id')

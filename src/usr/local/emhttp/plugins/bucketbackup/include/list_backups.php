@@ -2,11 +2,11 @@
 
 function list_backups() {
         $plugin = "bucketbackup";
-        if (!file_exists("/usr/local/emhttp/plugins/{$plugin}/settings.config")) {
+        if (!file_exists("/boot/config/plugins/{$plugin}/settings.config")) {
                 return;
         }
 
-        $settings = file_get_contents("/usr/local/emhttp/plugins/{$plugin}/settings.config");
+        $settings = file_get_contents("/boot/config/plugins/{$plugin}/settings.config");
         $json = json_decode($settings,true);
 
         $api_id = $json["api_id"];
