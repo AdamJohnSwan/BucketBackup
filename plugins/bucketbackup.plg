@@ -61,8 +61,8 @@
 	<FILE Run="/bin/bash">
 	<INLINE>
 		echo "Creating Directories"
-		rm -rf /tmp/&name;/tempFiles
-		mkdir -p /tmp/&name;/tempFiles
+		rm -rf /tmp/&name;/
+		mkdir -p /tmp/&name;/
 		mkdir -p /boot/config/plugins/&name;
 		chmod 700 /usr/local/emhttp/plugins/&name;/include/create_backup
 		chmod 700 /usr/local/emhttp/plugins/&name;/include/delete_old_backups
@@ -77,6 +77,7 @@
 		<INLINE>
 			removepkg &name;-&version;-x86_64-1
 			rm -rf &plugdir;
+			rm -rf /tmp/&name;/
 			rm -rf bucketbackup_archive_dir
 			rm -rf /boot/config/plugins/&name;
 			rm /boot/config/plugins/dynamix/&name;.cron
